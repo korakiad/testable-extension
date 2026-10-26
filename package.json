@@ -1,0 +1,1178 @@
+{
+  "name": "testable-tools",
+  "displayName": "Testable Tools",
+  "description": "Testable REST API as Copilot agent-mode tools with an interactive chat UI, mirroring the tools of Testable's hosted MCP server without using MCP.",
+  "version": "0.1.0",
+  "publisher": "local",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.99.0"
+  },
+  "enabledApiProposals": [
+    "chatOutputRenderer"
+  ],
+  "categories": [
+    "AI",
+    "Testing"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "testable.openDashboard",
+        "title": "Testable: Open Dashboard",
+        "icon": "$(beaker)"
+      },
+      {
+        "command": "testable.addApiKey",
+        "title": "Testable: Add API Key"
+      },
+      {
+        "command": "testable.selectApiKey",
+        "title": "Testable: Select API Key"
+      },
+      {
+        "command": "testable.removeApiKey",
+        "title": "Testable: Remove API Key"
+      }
+    ],
+    "configuration": {
+      "title": "Testable Tools",
+      "properties": {
+        "testable.apiUrl": {
+          "type": "string",
+          "default": "https://api.testable.io",
+          "description": "Base URL of the Testable REST API."
+        },
+        "testable.maxResponseChars": {
+          "type": "number",
+          "default": 60000,
+          "minimum": 1000,
+          "description": "Responses longer than this are truncated before being handed to the model."
+        },
+        "testable.localFolder": {
+          "type": "string",
+          "default": ".testable",
+          "description": "Folder, relative to the first workspace folder, that execution logs and files and pulled scenario files are saved to. It gets a .gitignore so nothing in it is committed."
+        }
+      }
+    },
+    "languageModelTools": [
+      {
+        "name": "testable_searchTools",
+        "displayName": "Search Testable Operations",
+        "toolReferenceName": "testable_searchTools",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(search)",
+        "tags": [
+          "testable"
+        ],
+        "userDescription": "Find Testable REST operations by keyword.",
+        "modelDescription": "Searches the catalog of Testable REST operations that testable_callTool can run: test cases, scenarios (scripts) and scenario files, test configurations, executions and their results, logs, metrics and output files, schedules, reports, runners and regions, integrations and VCS roots. Returns matching operation names with access (read/write), HTTP method and path, and a short description, ranked by the number of keyword matches. Use it to find the right operation, then call testable_describeTools for its exact parameters.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Keywords matched against operation names, paths and descriptions, e.g. [\"execution\", \"logs\"]. An operation matches if it contains at least one keyword."
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Maximum number of operations to return. Defaults to 20."
+            }
+          },
+          "required": [
+            "keywords"
+          ]
+        }
+      },
+      {
+        "name": "testable_describeTools",
+        "displayName": "Describe Testable Operations",
+        "toolReferenceName": "testable_describeTools",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(symbol-interface)",
+        "tags": [
+          "testable"
+        ],
+        "userDescription": "Show the full parameters of Testable REST operations.",
+        "modelDescription": "Returns the full descriptor (description and inputSchema with parameter types, descriptions and enums) for each requested Testable operation name. Always call this before running an operation with testable_callTool for the first time. Unknown names are listed in unknownTools; operations that exist on Testable's MCP server but cannot run in this extension are listed in unavailableTools with the reason.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "toolNames": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Operation names, e.g. from testable_searchTools."
+            }
+          },
+          "required": [
+            "toolNames"
+          ]
+        }
+      },
+      {
+        "name": "testable_callTool",
+        "displayName": "Call Testable Operation",
+        "toolReferenceName": "testable_callTool",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(play)",
+        "tags": [
+          "testable"
+        ],
+        "userDescription": "Run any Testable REST operation by name.",
+        "modelDescription": "Runs one Testable operation by name (from testable_searchTools or testable_describeTools) and returns the HTTP status and response body. Pass arguments exactly as the operation's inputSchema defines them: properties prefixed path_ fill URL path parameters, properties prefixed query_ become query-string parameters, and every other property is sent as a top-level field of the JSON body (do not wrap them in body or content). Operation descriptions may mention other operations by name; run those through this tool too. Write operations ask the user to confirm first. Not available in this extension: run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools. encode_base64 and decode_base64 run locally.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "toolName": {
+              "type": "string",
+              "description": "Operation name, e.g. getExecutionLogs."
+            },
+            "arguments": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "The operation's arguments, shaped as its inputSchema from testable_describeTools."
+            }
+          },
+          "required": [
+            "toolName"
+          ]
+        }
+      },
+      {
+        "name": "testable_showTests",
+        "displayName": "Testable: Show Tests",
+        "icon": "$(list-tree)",
+        "userDescription": "Show the test cases, scenarios and configurations of this workspace's repo.",
+        "modelDescription": "Lists Testable test cases with their scenarios (id, type, source, linked VCS root, declared params) and configurations (id, test type, scenario params). When Testable lets the API key read VCS roots, the list is narrowed to test cases whose scenarios use this workspace's git remote; the result says whether that happened. apiKey names the API key (organization) every Testable tool uses in this workspace; when the user has several, otherApiKeys lists the other organizations that also have test cases linked to this repo. Also shows an interactive page in the chat where the user can browse, change settings and params, pull or push scenario files and run configurations. Use it first when the user asks about their tests, and to find scenario and configuration IDs.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Only include test cases whose path or scenario names contain this text."
+            },
+            "allRepos": {
+              "type": "boolean",
+              "description": "Include test cases of every repo, not only this workspace's."
+            }
+          }
+        },
+        "toolReferenceName": "testable_showTests",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "testable",
+          "read"
+        ]
+      },
+      {
+        "name": "testable_showScenario",
+        "displayName": "Testable: Show Scenario",
+        "icon": "$(symbol-file)",
+        "userDescription": "Show the settings, files, repository and configurations of a scenario.",
+        "modelDescription": "Shows one Testable scenario: its settings (the scenario metadata, e.g. chromedriverOnly, seleniumVersion, nodeVersion, browsers, wdioCliArgs, screenshots), declared params, files, the linked VCS root (url, branch, auth type) and the configurations that run it. Call it before testable_updateScenarioSettings to get the exact setting names and current values.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "scenarioId": {
+              "type": "integer",
+              "description": "Scenario (script) ID."
+            }
+          },
+          "required": [
+            "scenarioId"
+          ]
+        },
+        "toolReferenceName": "testable_showScenario",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "testable",
+          "read"
+        ]
+      },
+      {
+        "name": "testable_downloadExecution",
+        "displayName": "Testable: Download Execution Logs and Files",
+        "icon": "$(cloud-download)",
+        "userDescription": "Download the logs and output files of an execution into the workspace.",
+        "modelDescription": "Downloads what is needed to debug a Testable execution into the workspace folder .testable/executions/<executionId>/: logs.txt (every log line at Debug level), execution.json, failed-results.json and the output files (screenshots, videos, HAR files, reports) under files/. Pass executionId, or confId to take the latest execution of a configuration. Returns the local paths; read them with your file tools to find the cause of a failure and fix the test code, or use them in a follow-up workflow.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "executionId": {
+              "type": "integer",
+              "description": "Execution ID."
+            },
+            "confId": {
+              "type": "integer",
+              "description": "Configuration ID; its most recent execution is used when executionId is omitted."
+            },
+            "outputFiles": {
+              "type": "boolean",
+              "description": "Also download output files. Defaults to true."
+            },
+            "contentType": {
+              "type": "string",
+              "description": "Only download output files of this MIME type, e.g. image/png."
+            },
+            "failuresOnly": {
+              "type": "boolean",
+              "description": "Only download output files from failed iterations."
+            }
+          }
+        },
+        "toolReferenceName": "testable_downloadExecution",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "testable",
+          "read"
+        ]
+      },
+      {
+        "name": "testable_pullScenarioFiles",
+        "displayName": "Testable: Pull Scenario Files",
+        "icon": "$(repo-pull)",
+        "userDescription": "Download the files of a scenario into the workspace.",
+        "modelDescription": "Downloads every file of a Testable scenario into .testable/scenarios/<scenarioId>-<name>/ in the workspace, keeping their paths, so they can be read and edited with your file tools. Files edited locally since the last pull are kept instead of overwritten (action keep-local) unless force is true. Upload the edits with testable_pushScenarioFiles.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "scenarioId": {
+              "type": "integer",
+              "description": "Scenario (script) ID."
+            },
+            "force": {
+              "type": "boolean",
+              "description": "Overwrite local copies even if they were edited."
+            }
+          },
+          "required": [
+            "scenarioId"
+          ]
+        },
+        "toolReferenceName": "testable_pullScenarioFiles",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "testable",
+          "read"
+        ]
+      },
+      {
+        "name": "testable_pushScenarioFiles",
+        "displayName": "Testable: Push Scenario Files",
+        "icon": "$(repo-push)",
+        "userDescription": "Upload edited scenario files back to Testable.",
+        "modelDescription": "Uploads the local copies of a scenario's files (the folder testable_pullScenarioFiles created) to Testable: changed files are updated and new files are created. Unchanged files are skipped and nothing is deleted in Testable. Pass paths (relative to the scenario folder) to upload only some files. The user confirms the list of files first.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "scenarioId": {
+              "type": "integer",
+              "description": "Scenario (script) ID."
+            },
+            "paths": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Only upload these files, e.g. [\"test/login.spec.js\"]."
+            }
+          },
+          "required": [
+            "scenarioId"
+          ]
+        },
+        "toolReferenceName": "testable_pushScenarioFiles",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "testable",
+          "write"
+        ]
+      },
+      {
+        "name": "testable_updateScenarioSettings",
+        "displayName": "Testable: Update Scenario Settings",
+        "icon": "$(settings-gear)",
+        "userDescription": "Change scenario settings such as chromedriverOnly.",
+        "modelDescription": "Changes scenario settings (the scenario metadata), e.g. {\"chromedriverOnly\": true}, {\"seleniumVersion\": \"4.x\"}, {\"wdioCliArgs\": \"--spec ./test/a.js\"}, or nested values with dotted keys such as {\"browsers.firefox\": \"Latest\"}. Only the given keys change and the rest of the metadata is kept. Keys must already exist on the scenario (see testable_showScenario) unless allowNewKeys is true; values keep their JSON type (boolean, number, string). The user confirms a before/after diff first.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "scenarioId": {
+              "type": "integer",
+              "description": "Scenario (script) ID."
+            },
+            "settings": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Setting name (dotted for nested values) to new value."
+            },
+            "allowNewKeys": {
+              "type": "boolean",
+              "description": "Allow adding settings the scenario does not have yet."
+            }
+          },
+          "required": [
+            "scenarioId",
+            "settings"
+          ]
+        },
+        "toolReferenceName": "testable_updateScenarioSettings",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "testable",
+          "write"
+        ]
+      },
+      {
+        "name": "testable_setScenarioParams",
+        "displayName": "Testable: Set Scenario Params",
+        "icon": "$(symbol-variable)",
+        "userDescription": "Set or remove the scenario params (environment variables) of a configuration.",
+        "modelDescription": "Sets or removes scenario params, the values a test configuration passes to its scenario as environment variables (stored as the configuration's scriptParams). Only the given params change; the others are kept. A param named baseUrl reaches the script as the environment variable BASE_URL (uppercased) or as ${__P(baseUrl)} in JMeter. The user confirms a before/after diff first.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "confId": {
+              "type": "integer",
+              "description": "Test configuration ID."
+            },
+            "set": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Params to add or change, name to value."
+            },
+            "unset": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Names of params to remove."
+            }
+          },
+          "required": [
+            "confId"
+          ]
+        },
+        "toolReferenceName": "testable_setScenarioParams",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "testable",
+          "write"
+        ]
+      },
+      {
+        "name": "testable_updateRepository",
+        "displayName": "Testable: Update Repository Branch or Token",
+        "icon": "$(git-branch)",
+        "userDescription": "Switch the branch a scenario checks out or replace its repository token.",
+        "modelDescription": "Switches the Git branch a scenario checks out and/or replaces the expired access token of its VCS root (repository). With scenarioId, branch changes only that scenario; with repositoryId alone, it changes the default branch of the VCS root. The token never goes through the chat: with updateToken true, VS Code asks the user for it in a password box, checks it against the repository and saves it (the user can save it anyway if the check fails); every scenario on that VCS root uses the new token. The user confirms first.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "scenarioId": {
+              "type": "integer",
+              "description": "Scenario whose branch (and linked VCS root) to change."
+            },
+            "repositoryId": {
+              "type": "integer",
+              "description": "VCS root ID, to change its default branch or token without a scenario."
+            },
+            "branch": {
+              "type": "string",
+              "description": "Branch or tag to check out."
+            },
+            "updateToken": {
+              "type": "boolean",
+              "description": "Ask the user for a new access token and save it."
+            }
+          }
+        },
+        "toolReferenceName": "testable_updateRepository",
+        "canBeReferencedInPrompt": true,
+        "tags": [
+          "testable",
+          "write"
+        ]
+      },
+      {
+        "name": "testable_getAllTestCases",
+        "displayName": "Testable: Get All Test Cases",
+        "toolReferenceName": "testable_getAllTestCases",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(beaker)",
+        "tags": [
+          "testable",
+          "read"
+        ],
+        "userDescription": "[read] GET /test-cases",
+        "modelDescription": "[read] GET /test-cases — Get all test cases\n\nOther Testable operations named in this description can be run with testable_callTool, except run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query_down": {
+              "type": "boolean",
+              "description": "Include execution details"
+            }
+          }
+        }
+      },
+      {
+        "name": "testable_getTestCase",
+        "displayName": "Testable: Get Test Case",
+        "toolReferenceName": "testable_getTestCase",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(beaker)",
+        "tags": [
+          "testable",
+          "read"
+        ],
+        "userDescription": "[read] GET /test-cases/:testCase",
+        "modelDescription": "[read] GET /test-cases/:testCase — Get a test case by ID\n\nOther Testable operations named in this description can be run with testable_callTool, except run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path_testCase": {
+              "type": "integer",
+              "description": "Test case ID"
+            },
+            "query_down": {
+              "type": "boolean",
+              "description": "Include failure details"
+            },
+            "query_up": {
+              "type": "boolean",
+              "description": "Include success details"
+            },
+            "query_includeMetricDefs": {
+              "type": "boolean",
+              "description": "Include metric definitions"
+            },
+            "query_includeRunning": {
+              "type": "boolean",
+              "description": "Include running executions"
+            },
+            "query_includeSchedules": {
+              "type": "boolean",
+              "description": "Include schedules"
+            },
+            "query_includeScripts": {
+              "type": "boolean",
+              "description": "Include scripts"
+            },
+            "query_granularity": {
+              "type": "string",
+              "description": "Data granularity level",
+              "enum": [
+                "10s",
+                "1m",
+                "5m"
+              ]
+            }
+          },
+          "required": [
+            "path_testCase"
+          ]
+        }
+      },
+      {
+        "name": "testable_getTestCaseConfs",
+        "displayName": "Testable: Get Test Case Confs",
+        "toolReferenceName": "testable_getTestCaseConfs",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(beaker)",
+        "tags": [
+          "testable",
+          "read"
+        ],
+        "userDescription": "[read] GET /test-cases/:testCaseId/confs",
+        "modelDescription": "[read] GET /test-cases/:testCaseId/confs — Get test configurations for a test case\n\nOther Testable operations named in this description can be run with testable_callTool, except run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path_testCaseId": {
+              "type": "integer",
+              "description": "Test case ID"
+            },
+            "query_offset": {
+              "type": "integer",
+              "description": "Pagination offset"
+            },
+            "query_limit": {
+              "type": "integer",
+              "description": "Pagination limit"
+            },
+            "query_sort": {
+              "type": "string",
+              "description": "Sort order",
+              "enum": [
+                "lexical",
+                "lastRun"
+              ]
+            },
+            "query_state": {
+              "type": "string",
+              "description": "Filter by pass/fail state",
+              "enum": [
+                "pass",
+                "fail",
+                "unknown",
+                "notRun"
+              ]
+            },
+            "query_filter": {
+              "type": "string",
+              "description": "Filter type",
+              "enum": [
+                "running",
+                "scheduled"
+              ]
+            },
+            "query_since": {
+              "type": "string",
+              "description": "Filter by date"
+            },
+            "query_emptyScript": {
+              "type": "boolean",
+              "description": "Include configurations with no script"
+            }
+          },
+          "required": [
+            "path_testCaseId"
+          ]
+        }
+      },
+      {
+        "name": "testable_getTestConf",
+        "displayName": "Testable: Get Test Conf",
+        "toolReferenceName": "testable_getTestConf",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(beaker)",
+        "tags": [
+          "testable",
+          "read"
+        ],
+        "userDescription": "[read] GET /test-confs/:conf",
+        "modelDescription": "[read] GET /test-confs/:conf — Get a test configuration by ID\n\nOther Testable operations named in this description can be run with testable_callTool, except run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path_conf": {
+              "type": "integer",
+              "description": "Test configuration ID"
+            },
+            "query_offset": {
+              "type": "integer",
+              "description": "Pagination offset"
+            },
+            "query_limit": {
+              "type": "integer",
+              "description": "Pagination limit"
+            },
+            "query_down": {
+              "type": "boolean",
+              "description": "Include failure details"
+            },
+            "query_up": {
+              "type": "boolean",
+              "description": "Include success details"
+            },
+            "query_includeRunning": {
+              "type": "boolean",
+              "description": "Include running executions"
+            },
+            "query_includeLatestExecution": {
+              "type": "boolean",
+              "description": "Include latest execution"
+            },
+            "query_granularity": {
+              "type": "string",
+              "description": "Data granularity level",
+              "enum": [
+                "10s",
+                "1m",
+                "5m"
+              ]
+            }
+          },
+          "required": [
+            "path_conf"
+          ]
+        }
+      },
+      {
+        "name": "testable_getTestConfExecutions",
+        "displayName": "Testable: Get Test Conf Executions",
+        "toolReferenceName": "testable_getTestConfExecutions",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(beaker)",
+        "tags": [
+          "testable",
+          "read"
+        ],
+        "userDescription": "[read] GET /test-confs/:conf/executions",
+        "modelDescription": "[read] GET /test-confs/:conf/executions — Get executions for a test configuration\n\nOther Testable operations named in this description can be run with testable_callTool, except run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path_conf": {
+              "type": "integer",
+              "description": "Test configuration ID"
+            },
+            "query_down": {
+              "type": "boolean",
+              "description": "Include failure details"
+            },
+            "query_up": {
+              "type": "boolean",
+              "description": "Include success details"
+            },
+            "query_includeScript": {
+              "type": "boolean",
+              "description": "Include script details"
+            },
+            "query_includeSummary": {
+              "type": "boolean",
+              "description": "Include execution summary"
+            },
+            "query_offset": {
+              "type": "integer",
+              "description": "Pagination offset"
+            },
+            "query_start": {
+              "type": "string",
+              "description": "Start date/time"
+            },
+            "query_end": {
+              "type": "string",
+              "description": "End date/time"
+            },
+            "query_limit": {
+              "type": "integer",
+              "description": "Maximum number of results"
+            },
+            "query_granularity": {
+              "type": "string",
+              "description": "Data granularity level",
+              "enum": [
+                "10s",
+                "1m",
+                "5m"
+              ]
+            }
+          },
+          "required": [
+            "path_conf"
+          ]
+        }
+      },
+      {
+        "name": "testable_getExecution",
+        "displayName": "Testable: Get Execution",
+        "toolReferenceName": "testable_getExecution",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(beaker)",
+        "tags": [
+          "testable",
+          "read"
+        ],
+        "userDescription": "[read] GET /executions/:executionId",
+        "modelDescription": "[read] GET /executions/:executionId — Retrieves detailed information about a test execution including configuration, regions, \nmetrics summary, and status. If the `completed` field is not `true`, the test is still running.\n\n**Common Patterns:**\n- Poll with `includeSummary=false` while test is running to reduce payload size\n- Use `baseline` parameter to compare two test runs\n- Set `includeChildren=true` for distributed tests to see per-region breakdown\n\nOther Testable operations named in this description can be run with testable_callTool, except run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path_executionId": {
+              "type": "integer",
+              "description": "Unique identifier for the execution"
+            },
+            "query_down": {
+              "type": "boolean",
+              "description": "Include execution region/chunk information"
+            },
+            "query_up": {
+              "type": "boolean",
+              "description": "Include parent configuration details"
+            },
+            "query_includeScript": {
+              "type": "boolean",
+              "description": "Include test script/scenario information"
+            },
+            "query_includeSummary": {
+              "type": "boolean",
+              "description": "Include aggregated metrics summary"
+            },
+            "query_includeAssignments": {
+              "type": "boolean",
+              "description": "Include browser/device assignments"
+            },
+            "query_includeBuckets": {
+              "type": "boolean",
+              "description": "Include histogram bucket details"
+            },
+            "query_includeChildren": {
+              "type": "boolean",
+              "description": "Include child execution details for multi-region tests"
+            },
+            "query_baseline": {
+              "type": "integer",
+              "description": "Execution ID to use as baseline for comparison"
+            },
+            "query_granularity": {
+              "type": "string",
+              "description": "Time granularity for metrics",
+              "enum": [
+                "10s",
+                "1m",
+                "5m",
+                "15m",
+                "1h"
+              ]
+            }
+          },
+          "required": [
+            "path_executionId"
+          ]
+        }
+      },
+      {
+        "name": "testable_getExecutionSummary",
+        "displayName": "Testable: Get Execution Summary",
+        "toolReferenceName": "testable_getExecutionSummary",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(beaker)",
+        "tags": [
+          "testable",
+          "read"
+        ],
+        "userDescription": "[read] GET /executions/:executionId/summary",
+        "modelDescription": "[read] GET /executions/:executionId/summary — Returns aggregated summary metrics for a test execution across all regions and resources.\nIncludes timing metrics (response times, connection times), counters (bandwidth, requests),\nand histograms (HTTP status codes, methods).\n\n**Metric Types:**\n- **Timing**: Includes count, mean, min, max, p50, p95, p99, standard deviation\n- **Counter**: Single aggregated value with units\n- **Histogram**: Map of values to their counts\n\n**Common Metrics:**\n- Response time metrics: firstReceivedMs, connectionOpenMs, connectionCloseMs\n- Network metrics: bandwidth, bytesSent, bytesReceived\n- Success tracking: success (count), outcome (histogram)\n- HTTP details: httpResponseCode, httpMethod\n- Custom metrics: User-defined metrics from test scripts\n\n**Use Cases:** Display high-level test results; Check if test met success criteria; Compare against baseline metrics; Feed into CI/CD pipeline decisions\n\nOther Testable operations named in this description can be run with testable_callTool, except run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path_executionId": {
+              "type": "integer",
+              "description": "Unique identifier for the execution"
+            },
+            "query_granularity": {
+              "type": "string",
+              "description": "Time granularity for metrics",
+              "enum": [
+                "10s",
+                "1m",
+                "5m",
+                "15m",
+                "1h"
+              ]
+            }
+          },
+          "required": [
+            "path_executionId"
+          ]
+        }
+      },
+      {
+        "name": "testable_getExecutionLogs",
+        "displayName": "Testable: Get Execution Logs",
+        "toolReferenceName": "testable_getExecutionLogs",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(beaker)",
+        "tags": [
+          "testable",
+          "read"
+        ],
+        "userDescription": "[read] GET /executions/:executionId/logs",
+        "modelDescription": "[read] GET /executions/:executionId/logs — Retrieves all logging captured during test execution in JSON or text format.\nIncludes system logs (test lifecycle events) and user-generated logs from test scripts.\nIgnore NODE_TLS_REJECT_UNAUTHORIZED warnings, ExperimentalWarning, and “ignore certificate errors” and do not mention that\nin any analysis you return to the user about the logs .\n\n**Default for AI:** Use `limit=1000` unless the user explicitly needs more or all logs.\nThis keeps responses manageable; use `limit=-1` only when the user asks for the full log set.\n\n**Log Levels:**\n- `Error`: Critical errors and failures\n- `Info`: Informational messages about test progress\n- `Debug`: Detailed debugging information\n\n**When analyzing why an execution failed:** Always use `level=Debug` to capture the most detailed\ninformation about what went wrong. Debug logs include fine-grained trace data, internal state, and\nstep-by-step execution details that are essential for root cause analysis. Do not use `Error` or\n`Info` level when investigating failures — you will miss critical context.\n\n**Format:**\n- Without `.txt`: Returns JSON with structured log entries\n- With `.txt`: Returns plain text format suitable for download\n\n**Use Cases:** Debug test failures; Monitor test progress in real-time; Extract errors for reporting; Download complete log file for offline analysis\n\nOther Testable operations named in this description can be run with testable_callTool, except run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path_executionId": {
+              "type": "integer",
+              "description": "Unique identifier for the execution"
+            },
+            "query_limit": {
+              "type": "integer",
+              "description": "Number of log entries to return (-1 for all)"
+            },
+            "query_asc": {
+              "type": "boolean",
+              "description": "Sort ascending by timestamp"
+            },
+            "query_systemOnly": {
+              "type": "boolean",
+              "description": "Only return system logs"
+            },
+            "query_level": {
+              "type": "string",
+              "description": "Minimum log level to return. Use `Debug` when analyzing why an execution failed — this is the most inclusive level and surfaces all available detail. `Info` omits debug traces; `Error` omits both, leaving only critical failures. Default to `Debug` for any failure investigation unless the user asks for a specific level.\n",
+              "enum": [
+                "Error",
+                "Info",
+                "Debug"
+              ]
+            },
+            "query_since": {
+              "type": "integer",
+              "description": "Start timestamp in Unix epoch milliseconds"
+            },
+            "query_until": {
+              "type": "integer",
+              "description": "End timestamp in Unix epoch milliseconds"
+            },
+            "query_client": {
+              "type": "integer",
+              "description": "Filter by user/engine number"
+            },
+            "query_iteration": {
+              "type": "integer",
+              "description": "Filter by iteration number"
+            },
+            "query_groups": {
+              "type": "string",
+              "description": "Filter by log group IDs (comma-separated). Not names. Use getExecutionLogGroups to map log group name to id, then pass those ids here."
+            },
+            "query_regions": {
+              "type": "string",
+              "description": "Filter by execution region IDs (comma-separated)"
+            },
+            "query_agents": {
+              "type": "string",
+              "description": "Filter by test runner IDs (comma-separated)"
+            }
+          },
+          "required": [
+            "path_executionId"
+          ]
+        }
+      },
+      {
+        "name": "testable_getExecutionFailedResults",
+        "displayName": "Testable: Get Execution Failed Results",
+        "toolReferenceName": "testable_getExecutionFailedResults",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(beaker)",
+        "tags": [
+          "testable",
+          "read"
+        ],
+        "userDescription": "[read] GET /executions/:executionId/failed-results",
+        "modelDescription": "[read] GET /executions/:executionId/failed-results — Retrieves all results that failed (non-successful HTTP status, exceptions, timeouts, etc.).\nAvailable in both JSON and CSV formats.\n\n**Failure Criteria:**\n- HTTP 4xx/5xx status codes\n- Network timeouts\n- Connection errors\n- Test script exceptions\n\n**Use Cases:** Debug test failures; Identify error patterns; Generate failure reports\n\nOther Testable operations named in this description can be run with testable_callTool, except run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path_executionId": {
+              "type": "integer",
+              "description": "Unique identifier for the execution"
+            },
+            "query_region": {
+              "type": "integer",
+              "description": "region"
+            },
+            "query_resource": {
+              "type": "integer",
+              "description": "resource"
+            },
+            "query_since": {
+              "type": "integer",
+              "description": "since"
+            },
+            "query_until": {
+              "type": "integer",
+              "description": "until"
+            },
+            "query_offset": {
+              "type": "integer",
+              "description": "offset"
+            },
+            "query_limit": {
+              "type": "integer",
+              "description": "limit"
+            }
+          },
+          "required": [
+            "path_executionId"
+          ]
+        }
+      },
+      {
+        "name": "testable_searchOrgExecutionsWithFilter",
+        "displayName": "Testable: Search Org Executions With Filter",
+        "toolReferenceName": "testable_searchOrgExecutionsWithFilter",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(beaker)",
+        "tags": [
+          "testable",
+          "read"
+        ],
+        "userDescription": "[read] POST /search",
+        "modelDescription": "[write] POST /search — Search executions in an organization with a filter Body fields are top-level arguments; do not wrap them in content or body unless the schema explicitly includes that property.\n\nOther Testable operations named in this description can be run with testable_callTool, except run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "query_offset": {
+              "type": "integer",
+              "description": "Offset for pagination"
+            },
+            "query_limit": {
+              "type": "integer",
+              "description": "Limit for pagination"
+            },
+            "query_countMatches": {
+              "type": "boolean",
+              "description": "Include count headers in response"
+            },
+            "testCases": {
+              "type": "array",
+              "description": "Filter by test case IDs",
+              "items": {
+                "type": "integer"
+              }
+            },
+            "configurations": {
+              "type": "array",
+              "description": "Filter by configuration IDs",
+              "items": {
+                "type": "integer"
+              }
+            },
+            "scenarios": {
+              "type": "array",
+              "description": "Filter by scenario IDs",
+              "items": {
+                "type": "integer"
+              }
+            },
+            "outcome": {
+              "type": "string",
+              "description": "Filter by outcome (e.g., success, failure)"
+            },
+            "tags": {
+              "type": "array",
+              "description": "Filter by tag IDs",
+              "items": {
+                "type": "integer"
+              }
+            },
+            "tagNames": {
+              "type": "array",
+              "description": "Filter by tag names",
+              "items": {
+                "type": "string"
+              }
+            },
+            "locations": {
+              "type": "array",
+              "description": "Filter by location IDs",
+              "items": {
+                "type": "integer"
+              }
+            },
+            "browsers": {
+              "type": "array",
+              "description": "Filter by browser types",
+              "items": {
+                "type": "string"
+              }
+            },
+            "timeRange": {
+              "type": "object",
+              "description": "timeRange",
+              "properties": {
+                "from": {
+                  "type": "integer",
+                  "description": "Start timestamp (Unix epoch in milliseconds)"
+                },
+                "to": {
+                  "type": "integer",
+                  "description": "End timestamp (Unix epoch in milliseconds)"
+                },
+                "relativeTime": {
+                  "type": "string",
+                  "description": "Relative time range (e.g., \"1d\", \"1w\", \"1m\")"
+                }
+              }
+            },
+            "metrics": {
+              "type": "array",
+              "description": "Filter by metric thresholds",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "metric": {
+                    "type": "string",
+                    "description": "Metric name"
+                  },
+                  "metricKey": {
+                    "type": "string",
+                    "description": "Metric key"
+                  },
+                  "threshold": {
+                    "type": "integer",
+                    "description": "Threshold value"
+                  },
+                  "operator": {
+                    "type": "string",
+                    "description": "Comparison operator (e.g., gt, lt, gte, lte, eq)"
+                  },
+                  "namespace": {
+                    "type": "string",
+                    "description": "Metric namespace"
+                  },
+                  "isPercentage": {
+                    "type": "boolean",
+                    "description": "Whether the threshold is a percentage"
+                  },
+                  "displayName": {
+                    "type": "string",
+                    "description": "Display name for the metric"
+                  }
+                },
+                "required": [
+                  "metric",
+                  "metricKey",
+                  "threshold",
+                  "operator",
+                  "namespace"
+                ]
+              }
+            },
+            "executionIds": {
+              "type": "array",
+              "description": "Filter by specific execution IDs",
+              "items": {
+                "type": "integer"
+              }
+            },
+            "testType": {
+              "type": "array",
+              "description": "Filter by test type",
+              "items": {
+                "type": "string"
+              }
+            },
+            "logicalOperator": {
+              "type": "string",
+              "description": "Logical operator for combining filters",
+              "enum": [
+                "AND",
+                "OR"
+              ]
+            },
+            "repos": {
+              "type": "array",
+              "description": "Filter by repository information",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "Repository URL"
+                  },
+                  "branch": {
+                    "type": "string",
+                    "description": "Repository branch"
+                  }
+                },
+                "required": [
+                  "url"
+                ]
+              }
+            },
+            "includeChildren": {
+              "type": "boolean",
+              "description": "Include child organization executions"
+            }
+          }
+        }
+      },
+      {
+        "name": "testable_startExecution",
+        "displayName": "Testable: Start Execution",
+        "toolReferenceName": "testable_startExecution",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(edit)",
+        "tags": [
+          "testable",
+          "write"
+        ],
+        "userDescription": "[write] POST /test-confs/:confId/executions",
+        "modelDescription": "[write] POST /test-confs/:confId/executions — Creates a new test execution from the specified configuration. By default the test\nstarts immediately; no further operations are needed.\n\n**Before starting a full execution:** For new or updated scenarios, run a smoke test first\nusing the `run_smoke_test` tool (with the scenario's script ID). Verify the smoke test\nresult: `passed` should be `true`, `status` should be `\"finished\"`, and review `diagnostics`,\n`logs`, and `suiteResults` for errors or failed assertions. Treat `passed=false`, log errors,\nfailed suite tests, or empty suite results with no result events as a failed smoke test to debug\nbefore proceeding. Only start a full test execution once the smoke test looks good.\n\n**When to use (default, no manual_start):**\n- Test runs right away. Response has `manualStart: false`.\n- Runners are provisioned and the test starts. Poll GET /executions/:id for progress.\n- **Note:** `running` may be `false` briefly while infrastructure starts—this is normal.\nDo not call requestExecutionStart or manualStartExecution; the test is already starting.\n\n**When to use (manual_start: true in request body):**\n- Only provisions infrastructure (on-demand runners); test does not run yet.\n- Response has `manualStart: true`. Call PUT /executions/:id/manual-start (manualStartExecution)\nto actually start the test when ready.\n\n**Execution flow (default):**\n1. Execution record created\n2. Test runners allocated (if using on-demand)\n3. Test starts running (unless manual_start is specified)\n4. Results streamed back during execution\n5. Final aggregation and cleanup after completion\n\n**Common patterns:** CI/CD trigger, scheduled run, on-demand API, trigger conditions.\n\nOther Testable operations named in this description can be run with testable_callTool, except run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path_confId": {
+              "type": "integer",
+              "description": "Test configuration ID"
+            }
+          },
+          "required": [
+            "path_confId"
+          ]
+        }
+      },
+      {
+        "name": "testable_stopExecution",
+        "displayName": "Testable: Stop Execution",
+        "toolReferenceName": "testable_stopExecution",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(edit)",
+        "tags": [
+          "testable",
+          "write"
+        ],
+        "userDescription": "[write] PUT /executions/:executionId/stop",
+        "modelDescription": "[write] PUT /executions/:executionId/stop — Requests to stop a running execution before it completes naturally.\nOnce stopped, the execution will transition through cleanup and result aggregation\nbefore reaching `completed: true` status.\n\n**Process:**\n1. Stop signal sent to all test runners\n2. Current iterations allowed to complete\n3. Results collected and aggregated\n4. Resources cleaned up\n5. Execution marked as completed\n\n**Important:**\n- Don't immediately try to delete after stopping\n- Wait for `completed: true` before deletion\n- Partial results will still be available\n- Test marked as cancelled but results are valid up to stop point\n\nOther Testable operations named in this description can be run with testable_callTool, except run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path_executionId": {
+              "type": "integer",
+              "description": "Unique identifier for the execution"
+            },
+            "query_isUserCancellation": {
+              "type": "boolean",
+              "description": "Whether this is a user-initiated stop"
+            }
+          },
+          "required": [
+            "path_executionId"
+          ]
+        }
+      }
+    ],
+    "chatOutputRenderers": [
+      {
+        "viewType": "testable.view",
+        "mimeTypes": [
+          "application/vnd.testable.view+json"
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "discover": "node scripts/discover-tools.mjs",
+    "generate": "node scripts/generate.mjs",
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p .",
+    "smoke": "node test/smoke.mjs",
+    "package": "vsce package --no-dependencies --allow-missing-repository --skip-license"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "@types/vscode": "~1.99.0",
+    "@vscode/vsce": "^3.0.0",
+    "typescript": "^5.9.3"
+  }
+}
