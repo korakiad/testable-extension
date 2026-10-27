@@ -1,12 +1,22 @@
-/* Chat output and panel UI. Colours come from the VS Code theme variables. */
+/* Chat output and panel UI. Colours come from the VS Code theme variables,
+   with Testable's brand colours for accents (high contrast themes keep the theme's own). */
 :root {
+  --brand: #0088f0;
+  --brand-ink: #0a3751;
+  --brand-tint: #e6f4ff;
+  --accent: #0072ce;
+  --accent-hover: #0062b3;
+  --accent-foreground: #ffffff;
+  --title: var(--brand-ink);
+  --tag-background: var(--brand-tint);
+  --tag-foreground: var(--brand-ink);
   --gap: 8px;
   --radius: 4px;
   --border: var(--vscode-widget-border, var(--vscode-panel-border, rgba(128, 128, 128, 0.35)));
   --muted: var(--vscode-descriptionForeground);
   --pass: var(--vscode-testing-iconPassed, #73c991);
   --fail: var(--vscode-testing-iconFailed, #f14c4c);
-  --run: var(--vscode-charts-blue, #3794ff);
+  --run: var(--brand);
   --warn: var(--vscode-charts-orange, #d18616);
   --mono: var(--vscode-editor-font-family, ui-monospace, Consolas, monospace);
 }
@@ -23,6 +33,23 @@ body {
   line-height: 1.4;
 }
 
+body.vscode-dark {
+  --brand-ink: var(--brand-tint);
+  --title: var(--vscode-foreground);
+  --tag-background: rgba(0, 136, 240, 0.2);
+  --tag-foreground: #9fd2ff;
+}
+body.vscode-high-contrast, body.vscode-high-contrast-light {
+  --brand-ink: var(--vscode-foreground);
+  --run: var(--vscode-charts-blue, #3794ff);
+  --accent: var(--vscode-button-background);
+  --accent-hover: var(--vscode-button-hoverBackground);
+  --accent-foreground: var(--vscode-button-foreground);
+  --title: var(--vscode-foreground);
+  --tag-background: var(--vscode-badge-background);
+  --tag-foreground: var(--vscode-badge-foreground);
+}
+
 body.panel { padding: 12px 20px 24px; background: var(--vscode-editor-background); }
 
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -31,7 +58,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .head { display: flex; align-items: flex-start; gap: var(--gap); margin-bottom: 8px; }
 .head .titles { flex: 1; min-width: 0; }
-.head h1 { margin: 0; font-size: 1.1em; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.head .mark { width: 18px; height: 18px; margin: 1px 2px 0 0; flex-shrink: 0; }
+.head .mark .ink { fill: var(--brand-ink); }
+.head .mark .dot { fill: var(--brand); }
+.head h1 { margin: 0; font-size: 1.1em; font-weight: 600; color: var(--title); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .head .sub { color: var(--muted); font-size: 0.92em; display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 1px; }
 .head .tools { display: flex; gap: 4px; flex-shrink: 0; }
 .head .sub svg { width: 12px; height: 12px; fill: currentColor; vertical-align: -2px; }
@@ -40,7 +70,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .progress.on { visibility: visible; }
 .progress::after {
   content: ''; display: block; width: 30%; height: 100%;
-  background: var(--vscode-progressBar-background, var(--run));
+  background: var(--run);
   animation: slide 1.1s ease-in-out infinite;
 }
 @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
@@ -57,8 +87,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
   cursor: pointer; white-space: nowrap;
 }
 .btn:hover { background: var(--vscode-button-secondaryHoverBackground); }
-.btn.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
-.btn.primary:hover { background: var(--vscode-button-hoverBackground); }
+.btn.primary { background: var(--accent); color: var(--accent-foreground); }
+.btn.primary:hover { background: var(--accent-hover); }
 .btn.icon { padding: 2px 5px; min-width: 24px; justify-content: center; background: transparent; border-color: transparent; color: var(--vscode-icon-foreground, inherit); }
 .btn.icon:hover { background: var(--vscode-toolbar-hoverBackground); }
 .btn:disabled { opacity: 0.5; cursor: default; }
@@ -119,7 +149,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .tag {
   font-size: 0.8em; border-radius: 3px; padding: 0 5px; flex-shrink: 0;
-  background: var(--vscode-badge-background); color: var(--vscode-badge-foreground);
+  background: var(--tag-background); color: var(--tag-foreground);
 }
 .id { font-family: var(--mono); color: var(--muted); font-size: 0.9em; }
 
@@ -147,7 +177,7 @@ input[type='text'], input[type='number'], input[type='search'], select {
   border-radius: 2px; padding: 2px 6px; min-height: 24px; width: 100%;
 }
 input::placeholder { color: var(--vscode-input-placeholderForeground); }
-input[type='checkbox'] { accent-color: var(--vscode-button-background); width: 15px; height: 15px; margin: 0; }
+input[type='checkbox'] { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
 
 .search { margin-bottom: 8px; }
 
@@ -170,7 +200,7 @@ input[type='checkbox'] { accent-color: var(--vscode-button-background); width: 1
 
 .savebar {
   position: sticky; bottom: 0; display: flex; align-items: center; gap: 6px;
-  margin-top: 8px; padding: 6px 8px; border: 1px solid var(--vscode-focusBorder); border-radius: var(--radius);
+  margin-top: 8px; padding: 6px 8px; border: 1px solid var(--run); border-radius: var(--radius);
   background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
 }
 .savebar .grow { flex: 1; }

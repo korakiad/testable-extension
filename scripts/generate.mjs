@@ -33,6 +33,9 @@ const UNAVAILABLE = {
 const MCP_ONLY_REASON = "Runs inside Testable's MCP server; there is no public REST endpoint for it.";
 const MCP_ONLY_PATH = /^\/(internal|mcp)\/|^\/resolve-openfin-version$/;
 
+// Testable's logo mark; codicons stay on the tools whose icon says what they do.
+const LOGO = { light: 'media/logo-light.svg', dark: 'media/logo-dark.svg' };
+
 const HEADER = /^\[(read|write)\]\s+(GET|POST|PUT|PATCH|DELETE)\s+(\S+)\s*(?:—\s*)?/;
 
 const root = new URL('../', import.meta.url);
@@ -312,7 +315,7 @@ const directTools = DIRECT.map((name) => {
     displayName: `Testable: ${humanize(name)}`,
     toolReferenceName: `testable_${name}`,
     canBeReferencedInPrompt: true,
-    icon: op.access === 'write' ? '$(edit)' : '$(beaker)',
+    icon: op.access === 'write' ? '$(edit)' : LOGO,
     tags: ['testable', op.access],
     userDescription: `[${op.access}] ${op.method} ${op.path}`,
     modelDescription: `${op.description}\n\nOther Testable operations named in this description can be run with testable_callTool, except ${unavailableNames}.`,

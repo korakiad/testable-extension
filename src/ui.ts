@@ -72,6 +72,10 @@ export function registerUi(context: vscode.ExtensionContext, services: Services,
       const panel = vscode.window.createWebviewPanel('testable.dashboard', 'Testable', vscode.ViewColumn.Active, {
         retainContextWhenHidden: true,
       });
+      panel.iconPath = {
+        light: vscode.Uri.joinPath(context.extensionUri, 'media', 'logo-light.svg'),
+        dark: vscode.Uri.joinPath(context.extensionUri, 'media', 'logo-dark.svg'),
+      };
       const listener = mount(context, services, panel.webview, { kind: 'loading' }, { panel: true, id: randomUUID() });
       panel.onDidDispose(() => listener.dispose());
     })

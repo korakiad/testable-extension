@@ -4,6 +4,7 @@
   "description": "Testable REST API as Copilot agent-mode tools with an interactive chat UI, mirroring the tools of Testable's hosted MCP server without using MCP.",
   "version": "0.1.0",
   "publisher": "local",
+  "icon": "media/icon.png",
   "private": true,
   "license": "UNLICENSED",
   "engines": {
@@ -25,7 +26,10 @@
       {
         "command": "testable.openDashboard",
         "title": "Testable: Open Dashboard",
-        "icon": "$(beaker)"
+        "icon": {
+          "light": "media/logo-light.svg",
+          "dark": "media/logo-dark.svg"
+        }
       },
       {
         "command": "testable.addApiKey",
@@ -448,7 +452,10 @@
         "displayName": "Testable: Get All Test Cases",
         "toolReferenceName": "testable_getAllTestCases",
         "canBeReferencedInPrompt": true,
-        "icon": "$(beaker)",
+        "icon": {
+          "light": "media/logo-light.svg",
+          "dark": "media/logo-dark.svg"
+        },
         "tags": [
           "testable",
           "read"
@@ -474,7 +481,10 @@
         "displayName": "Testable: Get Test Case",
         "toolReferenceName": "testable_getTestCase",
         "canBeReferencedInPrompt": true,
-        "icon": "$(beaker)",
+        "icon": {
+          "light": "media/logo-light.svg",
+          "dark": "media/logo-dark.svg"
+        },
         "tags": [
           "testable",
           "read"
@@ -536,7 +546,10 @@
         "displayName": "Testable: Get Test Case Confs",
         "toolReferenceName": "testable_getTestCaseConfs",
         "canBeReferencedInPrompt": true,
-        "icon": "$(beaker)",
+        "icon": {
+          "light": "media/logo-light.svg",
+          "dark": "media/logo-dark.svg"
+        },
         "tags": [
           "testable",
           "read"
@@ -607,7 +620,10 @@
         "displayName": "Testable: Get Test Conf",
         "toolReferenceName": "testable_getTestConf",
         "canBeReferencedInPrompt": true,
-        "icon": "$(beaker)",
+        "icon": {
+          "light": "media/logo-light.svg",
+          "dark": "media/logo-dark.svg"
+        },
         "tags": [
           "testable",
           "read"
@@ -669,7 +685,10 @@
         "displayName": "Testable: Get Test Conf Executions",
         "toolReferenceName": "testable_getTestConfExecutions",
         "canBeReferencedInPrompt": true,
-        "icon": "$(beaker)",
+        "icon": {
+          "light": "media/logo-light.svg",
+          "dark": "media/logo-dark.svg"
+        },
         "tags": [
           "testable",
           "read"
@@ -739,7 +758,10 @@
         "displayName": "Testable: Get Execution",
         "toolReferenceName": "testable_getExecution",
         "canBeReferencedInPrompt": true,
-        "icon": "$(beaker)",
+        "icon": {
+          "light": "media/logo-light.svg",
+          "dark": "media/logo-dark.svg"
+        },
         "tags": [
           "testable",
           "read"
@@ -811,7 +833,10 @@
         "displayName": "Testable: Get Execution Summary",
         "toolReferenceName": "testable_getExecutionSummary",
         "canBeReferencedInPrompt": true,
-        "icon": "$(beaker)",
+        "icon": {
+          "light": "media/logo-light.svg",
+          "dark": "media/logo-dark.svg"
+        },
         "tags": [
           "testable",
           "read"
@@ -851,7 +876,10 @@
         "displayName": "Testable: Get Execution Logs",
         "toolReferenceName": "testable_getExecutionLogs",
         "canBeReferencedInPrompt": true,
-        "icon": "$(beaker)",
+        "icon": {
+          "light": "media/logo-light.svg",
+          "dark": "media/logo-dark.svg"
+        },
         "tags": [
           "testable",
           "read"
@@ -929,7 +957,10 @@
         "displayName": "Testable: Get Execution Failed Results",
         "toolReferenceName": "testable_getExecutionFailedResults",
         "canBeReferencedInPrompt": true,
-        "icon": "$(beaker)",
+        "icon": {
+          "light": "media/logo-light.svg",
+          "dark": "media/logo-dark.svg"
+        },
         "tags": [
           "testable",
           "read"
@@ -982,7 +1013,10 @@
         "displayName": "Testable: Search Org Executions With Filter",
         "toolReferenceName": "testable_searchOrgExecutionsWithFilter",
         "canBeReferencedInPrompt": true,
-        "icon": "$(beaker)",
+        "icon": {
+          "light": "media/logo-light.svg",
+          "dark": "media/logo-dark.svg"
+        },
         "tags": [
           "testable",
           "read"
