@@ -38,7 +38,7 @@ Testable ใส่ API key ไว้ใน URL ที่ส่งกลับม
 
 ## ติดตั้งและใช้งาน
 
-1. ติดตั้ง `testable-tools-0.1.0.vsix` ผ่าน Extensions → `...` → Install from VSIX
+1. ติดตั้ง `testable-tools-<version>.vsix` ผ่าน Extensions → `...` → Install from VSIX (โหลดจาก GitHub Releases หรือ build เองด้วย `npm run package`)
 2. รันคำสั่ง **Testable: Add API Key** (key จะเก็บใน SecretStorage ของ VS Code)
 3. เปิด Copilot Chat ในโหมด Agent แล้วกดเปิด tool ที่ขึ้นต้นด้วย Testable
 
@@ -108,3 +108,14 @@ npm run package
 ```
 
 รายชื่อ tool ที่ประกาศตรงแก้ได้ที่ `DIRECT` ใน `scripts/generate.mjs` ส่วนคำอธิบาย tool กลุ่ม workflow อยู่ใน `workflowTools` ไฟล์เดียวกัน
+
+## ออกเวอร์ชันใหม่
+
+PR ไม่ต้องแก้ `version` ใน `package.json` แค่เขียนสิ่งที่เปลี่ยนไว้ใต้ `Unreleased` ใน `CHANGELOG.md` เลขเวอร์ชันเปลี่ยนตอนจะแจก `.vsix` ใหม่เท่านั้น เพื่อให้หนึ่งเลขตรงกับไฟล์ `.vsix` หนึ่งไฟล์ ช่วง 0.x ขึ้น minor เมื่อมีความสามารถใหม่หรือพฤติกรรมเปลี่ยน และขึ้น patch เมื่อแก้บั๊กอย่างเดียว
+
+ทำบน `main`:
+
+1. เปลี่ยนหัวข้อ `Unreleased` ใน `CHANGELOG.md` เป็นเลขเวอร์ชันใหม่กับวันที่ แล้ว commit (`npm version` ต้องการ working tree ที่ไม่มีไฟล์ค้าง)
+2. `npm version minor` หรือ `npm version patch` จะแก้ `package.json` และ `package-lock.json` แล้ว commit และสร้าง tag `v<version>` ให้
+3. `npm run package` ได้ `testable-tools-<version>.vsix`
+4. `git push --follow-tags` แล้วสร้าง GitHub Release ของ tag นั้นพร้อมแนบไฟล์ `.vsix`
