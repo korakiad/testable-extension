@@ -21,16 +21,20 @@ export interface Banner {
 /** Every view names the API key it was loaded with, and the page keeps using that key. */
 export type View = { account?: testable.AccountRef } & (
   | { kind: 'loading' }
-  /** accounts: what each API key's organization links to this repo, when there is more than one key. */
-  | { kind: 'tests'; data: testable.TestsView; accounts?: AccountLink[]; banner?: Banner }
+  /**
+   * accounts: what each API key's organization links to this repo, when there is more than one key.
+   * workspaceAccountId: the workspace's key; account (the page's) differs from it when a tool's apiKey named
+   * another key, or when the workspace switched keys after the page loaded.
+   */
+  | { kind: 'tests'; data: testable.TestsView; accounts?: AccountLink[]; workspaceAccountId?: string; banner?: Banner }
   | { kind: 'scenario'; data: testable.ScenarioDetail; sync?: testable.SyncResult; banner?: Banner }
   | { kind: 'conf'; data: testable.ConfDetail; banner?: Banner }
   | { kind: 'execution'; data: testable.ExecutionArtifacts; banner?: Banner }
 );
 
 export interface Services {
-  /** A client for the given API key, or the workspace's. */
-  client(token?: vscode.CancellationToken, accountId?: string): Promise<testable.Testable>;
+  /** A client for the API key a tool's apiKey argument names or a page was opened with, else the workspace's. */
+  client(opts?: { token?: vscode.CancellationToken; accountId?: string; apiKey?: string }): Promise<testable.Testable>;
   /** Folder that downloads and pulled scenario files go to. */
   root(): string;
   repos(): Promise<testable.RepoInfo[]>;
@@ -68,6 +72,10 @@ export function registerUi(context: vscode.ExtensionContext, services: Services,
       const panel = vscode.window.createWebviewPanel('testable.dashboard', 'Testable', vscode.ViewColumn.Active, {
         retainContextWhenHidden: true,
       });
+      panel.iconPath = {
+        light: vscode.Uri.joinPath(context.extensionUri, 'media', 'logo-light.svg'),
+        dark: vscode.Uri.joinPath(context.extensionUri, 'media', 'logo-dark.svg'),
+      };
       const listener = mount(context, services, panel.webview, { kind: 'loading' }, { panel: true, id: randomUUID() });
       panel.onDidDispose(() => listener.dispose());
     })
@@ -157,7 +165,11 @@ function hash(bytes: Uint8Array): string {
 // --- views shared with the chat tools ------------------------------------------------
 
 /** The test cases of the client's organization, plus what every other API key's organization links to this repo. */
-export async function testsView(services: Services, t: testable.Testable, opts: { query?: string; allRepos?: boolean } = {}): Promise<View> {
+export async function testsView(
+  services: Services,
+  t: testable.Testable,
+  opts: { query?: string; allRepos?: boolean } = {}
+): Promise<Extract<View, { kind: 'tests' }>> {
   const multiple = services.accounts.list().length > 1;
   const [data, others] = await Promise.all([
     testable.listTests(t, await services.repos(), opts),
@@ -165,7 +177,7 @@ export async function testsView(services: Services, t: testable.Testable, opts: 
   ]);
   const own = services.accounts.list().find((a) => a.id === t.account?.id);
   const accounts = multiple && own ? [{ account: own, link: data.link }, ...others] : undefined;
-  return { kind: 'tests', data, accounts, account: t.account };
+  return { kind: 'tests', data, accounts, workspaceAccountId: services.accounts.picked()?.id, account: t.account };
 }
 
 export async function scenarioView(services: Services, t: testable.Testable, scenarioId: number, extra: { sync?: testable.SyncResult; banner?: Banner } = {}): Promise<View> {
@@ -234,13 +246,13 @@ async function handle(services: Services, method: string, p: any, accountId?: st
   if (method === 'useAccount' || method === 'selectAccount') {
     const account = method === 'useAccount' ? { id: String(p.id) } : await services.accounts.select();
     if (!account) throw new Cancelled();
-    const view = await testsView(services, await services.client(undefined, account.id));
+    const view = await testsView(services, await services.client({ accountId: account.id }));
     // Use only switches the workspace once the key has loaded; select() already did.
     if (method === 'useAccount') await services.accounts.use(account.id);
-    return view;
+    return { ...view, workspaceAccountId: account.id };
   }
 
-  const t = await services.client(undefined, accountId);
+  const t = await services.client({ accountId });
   const root = services.root();
   switch (method) {
     case 'load':

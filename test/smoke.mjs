@@ -76,6 +76,18 @@ const apiUrl = env.TESTABLE_API_URL ?? 'https://api.testable.io';
   assert.equal(wf.latestLink([link('unavailable'), neverRun]).name, 'never');
   assert.equal(wf.latestLink([neverRun, old]).name, 'old');
   assert.equal(wf.latestLink([link('nomatch'), { error: 'x' }]), undefined);
+
+  // A tool's apiKey argument names a key: exactly, else ignoring case when only one key matches that way.
+  const keys = [{ id: '1', name: 'Org A' }, { id: '2', name: 'org b' }, { id: '3', name: 'ORG B' }];
+  assert.equal(wf.findAccount(keys, ' Org A ').id, '1');
+  assert.equal(wf.findAccount(keys, 'org a').id, '1');
+  assert.equal(wf.findAccount(keys, 'ORG B').id, '3');
+  assert.equal(wf.findAccount(keys, 'Org B'), undefined);
+  assert.equal(wf.findAccount(keys, 'Org C'), undefined);
+  assert.ok(wf.isEveryKey(' All ') && !wf.isEveryKey('Org A') && !wf.isEveryKey(undefined));
+
+  // Operations the tools run with every API key must exist and only read.
+  for (const name of client.ORG_WIDE) assert.equal(findOperation(name)?.access, 'read', name);
   console.log('offline checks: ok');
 }
 

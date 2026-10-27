@@ -135,6 +135,8 @@
     sparkle: 'M8 1l1.5 4.5L14 7l-4.5 1.5L8 13l-1.5-4.5L2 7l4.5-1.5z',
   };
   const icon = (name) => `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${paths[name]}"/></svg>`;
+  // Testable's logo mark, coloured by view.css so it follows the theme.
+  const mark = `<svg class="mark" viewBox="54 72 427 427" aria-hidden="true"><path class="ink" d="M80 108H278a44 44 0 0 1 44 44V463H220V209H80z"/><rect class="dot" x="352" y="109" width="102" height="102"/></svg>`;
   const iconBtn = (name, label, data) =>
     `<button class="btn icon" title="${esc(label)}" aria-label="${esc(label)}" ${data}>${icon(name)}</button>`;
   const btn = (label, data, opts = {}) =>
@@ -145,8 +147,9 @@
       .join(' ');
 
   function header(title, sub, tools = '') {
-    const backBtn = state.stack.length > 1 ? iconBtn('back', 'Back', data({ act: 'back' })) : '';
-    return `<div class="head">${backBtn}<div class="titles"><h1 title="${esc(title)}">${esc(title)}</h1><div class="sub">${sub}</div></div><div class="tools">${tools}</div></div>
+    // The first page shows the mark where later pages show Back.
+    const lead = state.stack.length > 1 ? iconBtn('back', 'Back', data({ act: 'back' })) : mark;
+    return `<div class="head">${lead}<div class="titles"><h1 title="${esc(title)}">${esc(title)}</h1><div class="sub">${sub}</div></div><div class="tools">${tools}</div></div>
       <div class="progress${busy ? ' on' : ''}" id="progress"></div>${bannerHtml(top().banner)}`;
   }
 
@@ -202,7 +205,8 @@
    */
   function accountsHtml(view) {
     if (!view.accounts || !view.data.repos?.length) return '';
-    const inUse = view.accounts.find((a) => a.account.id === view.account?.id);
+    // The workspace's key; the page itself may have loaded with another one (a tool's apiKey argument).
+    const inUse = view.accounts.find((a) => a.account.id === (view.workspaceAccountId ?? view.account?.id));
     const linked = (a) => a?.link?.status === 'matched';
     // Another organization is worth a look when it ran this repo's tests more recently, or when the key in use has none.
     const other = view.accounts

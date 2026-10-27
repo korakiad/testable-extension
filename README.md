@@ -38,7 +38,7 @@ Testable ใส่ API key ไว้ใน URL ที่ส่งกลับม
 
 ## ติดตั้งและใช้งาน
 
-1. ติดตั้ง `testable-tools-0.1.0.vsix` ผ่าน Extensions → `...` → Install from VSIX
+1. ติดตั้ง `testable-tools-<version>.vsix` ผ่าน Extensions → `...` → Install from VSIX (โหลดจาก GitHub Releases หรือ build เองด้วย `npm run package`)
 2. รันคำสั่ง **Testable: Add API Key** (key จะเก็บใน SecretStorage ของ VS Code)
 3. เปิด Copilot Chat ในโหมด Agent แล้วกดเปิด tool ที่ขึ้นต้นด้วย Testable
 
@@ -53,6 +53,24 @@ Testable ใส่ API key ไว้ใน URL ที่ส่งกลับม
 - หน้า Testable มีส่วน **API keys · this repo** ที่บอกเหมือนกัน ถ้า org อื่นมี test case ของ repo นี้ที่รันใหม่กว่า (เช่นเคยสร้างไว้ผิด org) จะขึ้นเตือนพร้อมปุ่ม Use
 - หน้าที่เปิดค้างไว้ในแชทหรือ dashboard จะใช้ key เดิมที่โหลดหน้านั้นมา แม้ workspace จะเปลี่ยนไปใช้ key อื่นแล้ว
 - **Testable: Remove API Key** ลบ key ออก
+
+#### ดูของ org อื่นในแชท
+
+ปกติทุก tool ใช้ key ของ workspace ซึ่งก็คือ org ของ repo ที่เปิดอยู่ ถ้าอยาก investigate org อื่นก็ถามในแชทได้เลยโดยไม่ต้องสลับ key ของ workspace
+
+- หาด้วย ID (execution, scenario, configuration, test case ฯลฯ) จะลอง key ของ workspace ก่อน ถ้าได้ 401/403/404 จะลอง key ที่เหลือทีละตัว เจอแล้วจะบอก model ว่าเจอใน key ไหน หน้าในแชทที่เปิดจากผลนั้นก็จะใช้ key นั้นต่อ ถ้าหาเจอด้วย key ของ workspace ก็ยิงแค่ครั้งเดียวเหมือนเดิม
+- list และ search ระดับ org (`getAllTestCases`, `getOrgTestCaseSummary`, `searchOrgExecutionsWithFilter`, `countOrgExecutionsWithFilter`, `getOrgReports`, `getOrgScheduledTests` ฯลฯ ดู `ORG_WIDE` ใน `src/client.ts`) ใช้ key ของ workspace ท้ายผลจะบอก model ว่ามี key อื่นอะไรอีก ถ้าส่ง `apiKey: "all"` จะยิงทุก key พร้อมกันแล้วแยกผลตาม org แต่ละ org ได้ขนาดผลลัพธ์ `maxResponseChars` หารด้วยจำนวน key
+- `testable_showTests` แสดง test case ของ key เดียว เพราะหน้านั้นผูกกับ org เดียว แต่จะบอกว่า org อื่นมี test case ของ repo นี้ด้วยไหม
+- tool ที่เขียนข้อมูลไม่สลับ key เอง ใช้ key ของ workspace หรือ `apiKey` ที่ระบุเท่านั้น และไม่รับ `"all"` ถ้าได้ 401/403/404 จะ error บอก model ให้ลองใหม่โดยระบุ `apiKey`
+
+ทุก tool ที่เรียก Testable (ยกเว้น `testable_searchTools` กับ `testable_describeTools`) รับ argument `apiKey` เป็นชื่อ key ได้ เพื่อใช้เฉพาะ org นั้น เช่นบอกในแชทว่า "ดู execution 123 ของ Org B" model จะส่ง `apiKey: "Org B"` ไปกับ tool นั้น ส่วน key ของ workspace ไม่เปลี่ยน
+
+- ชื่อไม่สนตัวพิมพ์เล็กใหญ่ ถ้าไม่มี key ชื่อนั้น tool จะ error พร้อมรายชื่อ key ทั้งหมดให้ model เลือกใหม่ ส่วนชื่อ `all` สงวนไว้ ตั้งเป็นชื่อ key ไม่ได้
+- `testable_callTool` ใส่ `apiKey` ข้าง `toolName` ไม่ใช่ใน `arguments`
+- `testable_showTests` บอก model ว่ามี key อะไรบ้าง (`apiKeys`) และถ้าใช้ key อื่น จะบอก key ของ workspace ไว้ใน `workspaceApiKey` ด้วย
+- ถ้ามี key มากกว่าหนึ่งตัว กล่องยืนยันของ tool ที่เขียนข้อมูลจะบอกเสมอว่าจะเขียนลง key ไหน และข้อความตอนเรียก tool จะบอกชื่อ key ที่ส่งมาใน `apiKey`
+- ถ้าระบุ `apiKey` แล้วได้ HTTP 401/403/404 error จะบอก model ว่าใช้ key ไหนไป และมี key อื่นอะไรบ้าง (ไม่ลอง key อื่นเองเพราะระบุมาแล้ว)
+- หน้าที่เปิดจาก tool ที่ส่ง `apiKey` จะใช้ key นั้นต่อ ส่วน **in use** ในหน้านั้นยังหมายถึง key ของ workspace
 
 key จากเวอร์ชันก่อนที่มีแค่ตัวเดียวจะย้ายมาเป็น key ชื่อ `Default` ให้อัตโนมัติ
 
@@ -90,3 +108,14 @@ npm run package
 ```
 
 รายชื่อ tool ที่ประกาศตรงแก้ได้ที่ `DIRECT` ใน `scripts/generate.mjs` ส่วนคำอธิบาย tool กลุ่ม workflow อยู่ใน `workflowTools` ไฟล์เดียวกัน
+
+## ออกเวอร์ชันใหม่
+
+PR ไม่ต้องแก้ `version` ใน `package.json` แค่เขียนสิ่งที่เปลี่ยนไว้ใต้ `Unreleased` ใน `CHANGELOG.md` เลขเวอร์ชันเปลี่ยนตอนจะแจก `.vsix` ใหม่เท่านั้น เพื่อให้หนึ่งเลขตรงกับไฟล์ `.vsix` หนึ่งไฟล์ ช่วง 0.x ขึ้น minor เมื่อมีความสามารถใหม่หรือพฤติกรรมเปลี่ยน และขึ้น patch เมื่อแก้บั๊กอย่างเดียว
+
+ทำบน `main`:
+
+1. เปลี่ยนหัวข้อ `Unreleased` ใน `CHANGELOG.md` เป็นเลขเวอร์ชันใหม่กับวันที่ แล้ว commit (`npm version` ต้องการ working tree ที่ไม่มีไฟล์ค้าง)
+2. `npm version minor` หรือ `npm version patch` จะแก้ `package.json` และ `package-lock.json` แล้ว commit และสร้าง tag `v<version>` ให้
+3. `npm run package` ได้ `testable-tools-<version>.vsix`
+4. `git push --follow-tags` แล้วสร้าง GitHub Release ของ tag นั้นพร้อมแนบไฟล์ `.vsix`
