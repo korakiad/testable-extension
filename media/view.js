@@ -202,7 +202,8 @@
    */
   function accountsHtml(view) {
     if (!view.accounts || !view.data.repos?.length) return '';
-    const inUse = view.accounts.find((a) => a.account.id === view.account?.id);
+    // The workspace's key; the page itself may have loaded with another one (a tool's apiKey argument).
+    const inUse = view.accounts.find((a) => a.account.id === (view.workspaceAccountId ?? view.account?.id));
     const linked = (a) => a?.link?.status === 'matched';
     // Another organization is worth a look when it ran this repo's tests more recently, or when the key in use has none.
     const other = view.accounts

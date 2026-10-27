@@ -69,9 +69,31 @@ export class Accounts {
     return this.detecting;
   }
 
-  /** A client for the given account (a page keeps using the one it was opened with), or for the workspace's. */
-  async client(opts: { accountId?: string; token?: vscode.CancellationToken } = {}): Promise<testable.Testable> {
-    const account = opts.accountId ? this.get(opts.accountId) : await this.current();
+  /**
+   * The account a call uses: the one a tool's apiKey argument names, the one a page was
+   * opened with (a page keeps using it), or the workspace's. apiKey "all" starts with the
+   * workspace's; the tools try the others themselves.
+   */
+  async resolve(opts: { accountId?: string; apiKey?: string } = {}): Promise<Account> {
+    await this.migrate();
+    if (opts.apiKey && !testable.isEveryKey(opts.apiKey)) return this.named(opts.apiKey);
+    return opts.accountId ? this.get(opts.accountId) : this.current();
+  }
+
+  /** The account named by a tool's apiKey argument; the error lists the names for the model. */
+  named(name: string): Account {
+    const account = testable.findAccount(this.list(), name);
+    if (account) return account;
+    const all = this.list().map((a) => `"${a.name}"${a.orgId ? ` (org ${a.orgId})` : ''}`);
+    throw new Error(
+      all.length
+        ? `No Testable API key is named "${name}". The user's API keys: ${all.join(', ')}. Pass one of these names as apiKey, "${testable.EVERY_KEY}" to look in every organization, or leave apiKey out to use this workspace's key.`
+        : 'No Testable API key is set. Ask the user to run the "Testable: Add API Key" command.'
+    );
+  }
+
+  async client(opts: { accountId?: string; apiKey?: string; token?: vscode.CancellationToken } = {}): Promise<testable.Testable> {
+    const account = await this.resolve(opts);
     const abort = new AbortController();
     opts.token?.onCancellationRequested(() => abort.abort());
     return this.connect(account, abort.signal);
@@ -273,7 +295,13 @@ export class Accounts {
       ignoreFocusOut: true,
       ...opts,
       validateInput: (v) =>
-        !v.trim() ? 'Enter a name.' : this.list().some((a) => a.name === v.trim() && a.id !== except?.id) ? 'Another key already has this name.' : undefined,
+        !v.trim()
+          ? 'Enter a name.'
+          : testable.isEveryKey(v)
+            ? `"${testable.EVERY_KEY}" is reserved: the chat uses it to mean every key.`
+            : this.list().some((a) => a.name === v.trim() && a.id !== except?.id)
+              ? 'Another key already has this name.'
+              : undefined,
     });
     return name?.trim() || undefined;
   }

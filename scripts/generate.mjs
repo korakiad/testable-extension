@@ -62,6 +62,8 @@ for (const tool of discovery.tools) {
 
 const missing = DIRECT.filter((n) => !operations.some((o) => o.name === n));
 if (missing.length) throw new Error(`DIRECT tools not in catalog: ${missing.join(', ')}`);
+const clash = operations.filter((o) => o.inputSchema.properties?.apiKey).map((o) => o.name);
+if (clash.length) throw new Error(`Operations with their own apiKey argument, which the tools' apiKey would hide: ${clash.join(', ')}`);
 
 writeFileSync(
   new URL('src/catalog.json', root),
@@ -70,6 +72,14 @@ writeFileSync(
 
 const humanize = (name) => name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
 const unavailableNames = 'run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools';
+
+// Every tool that calls Testable takes it (src/extension.ts withApiKey); no operation has an argument of that name.
+const apiKeyDescription =
+  "Which of the user's Testable API keys (organizations) to use; testable_showTests lists them under apiKeys. Leave it out to use this workspace's key, the organization of the open repo, which is what the user usually means; a lookup by ID that this key cannot find is retried with the user's other keys, and the result says which key found it. Pass a key's name when the user asks about another organization, or \"all\" to run an organization-wide list or search (getAllTestCases, getOrgTestCaseSummary, searchOrgExecutionsWithFilter and the like) in every organization. Changes use exactly one key, the workspace's or the one named here (not \"all\"), so pass the key a lookup reported when changing what it found.";
+const withApiKey = (schema, description = apiKeyDescription) => ({
+  ...schema,
+  properties: { ...schema.properties, apiKey: { type: 'string', description } },
+});
 
 const metaTools = [
   {
@@ -126,8 +136,8 @@ const metaTools = [
     tags: ['testable'],
     userDescription: 'Run any Testable REST operation by name.',
     modelDescription:
-      `Runs one Testable operation by name (from testable_searchTools or testable_describeTools) and returns the HTTP status and response body. Pass arguments exactly as the operation's inputSchema defines them: properties prefixed path_ fill URL path parameters, properties prefixed query_ become query-string parameters, and every other property is sent as a top-level field of the JSON body (do not wrap them in body or content). Operation descriptions may mention other operations by name; run those through this tool too. Write operations ask the user to confirm first. Not available in this extension: ${unavailableNames}. encode_base64 and decode_base64 run locally.`,
-    inputSchema: {
+      `Runs one Testable operation by name (from testable_searchTools or testable_describeTools) and returns the HTTP status and response body. Pass arguments exactly as the operation's inputSchema defines them: properties prefixed path_ fill URL path parameters, properties prefixed query_ become query-string parameters, and every other property is sent as a top-level field of the JSON body (do not wrap them in body or content). apiKey (which organization; see its description) goes next to toolName, not inside arguments. Operation descriptions may mention other operations by name; run those through this tool too. Write operations ask the user to confirm first. Not available in this extension: ${unavailableNames}. encode_base64 and decode_base64 run locally.`,
+    inputSchema: withApiKey({
       type: 'object',
       properties: {
         toolName: { type: 'string', description: 'Operation name, e.g. getExecutionLogs.' },
@@ -138,7 +148,7 @@ const metaTools = [
         },
       },
       required: ['toolName'],
-    },
+    }),
   },
 ];
 
@@ -151,7 +161,7 @@ const workflowTools = [
     access: 'read',
     userDescription: "Show the test cases, scenarios and configurations of this workspace's repo.",
     modelDescription:
-      "Lists Testable test cases with their scenarios (id, type, source, linked VCS root, declared params) and configurations (id, test type, scenario params). When Testable lets the API key read VCS roots, the list is narrowed to test cases whose scenarios use this workspace's git remote; the result says whether that happened. apiKey names the API key (organization) every Testable tool uses in this workspace; when the user has several, otherApiKeys lists the other organizations that also have test cases linked to this repo. Also shows an interactive page in the chat where the user can browse, change settings and params, pull or push scenario files and run configurations. Use it first when the user asks about their tests, and to find scenario and configuration IDs.",
+      "Lists Testable test cases with their scenarios (id, type, source, linked VCS root, declared params) and configurations (id, test type, scenario params). When Testable lets the API key read VCS roots, the list is narrowed to test cases whose scenarios use this workspace's git remote; the result says whether that happened. In the result, apiKey names the API key (organization) the list was read with: the workspace's, unless the apiKey argument named another (then workspaceApiKey names the workspace's). When the user has several keys, apiKeys lists them all and otherApiKeys the other organizations that also have test cases linked to this repo. Also shows an interactive page in the chat where the user can browse, change settings and params, pull or push scenario files and run configurations. Use it first when the user asks about their tests, and to find scenario and configuration IDs.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -283,6 +293,13 @@ const workflowTools = [
   },
 ].map(({ access, ...tool }) => ({
   ...tool,
+  inputSchema: withApiKey(
+    tool.inputSchema,
+    // Its page belongs to one organization; the result names the others that link this repo.
+    tool.name === 'testable_showTests'
+      ? "Name of one of the user's Testable API keys (organizations) to list the test cases of, instead of this workspace's. The result lists every key under apiKeys, and under otherApiKeys the other organizations that also have test cases linked to this repo. To search the test cases of every organization, use testable_getAllTestCases with apiKey \"all\"."
+      : undefined
+  ),
   toolReferenceName: tool.name,
   canBeReferencedInPrompt: true,
   tags: ['testable', access],
@@ -299,7 +316,7 @@ const directTools = DIRECT.map((name) => {
     tags: ['testable', op.access],
     userDescription: `[${op.access}] ${op.method} ${op.path}`,
     modelDescription: `${op.description}\n\nOther Testable operations named in this description can be run with testable_callTool, except ${unavailableNames}.`,
-    inputSchema: op.inputSchema,
+    inputSchema: withApiKey(op.inputSchema),
   };
 });
 

@@ -54,6 +54,24 @@ Testable ใส่ API key ไว้ใน URL ที่ส่งกลับม
 - หน้าที่เปิดค้างไว้ในแชทหรือ dashboard จะใช้ key เดิมที่โหลดหน้านั้นมา แม้ workspace จะเปลี่ยนไปใช้ key อื่นแล้ว
 - **Testable: Remove API Key** ลบ key ออก
 
+#### ดูของ org อื่นในแชท
+
+ปกติทุก tool ใช้ key ของ workspace ซึ่งก็คือ org ของ repo ที่เปิดอยู่ ถ้าอยาก investigate org อื่นก็ถามในแชทได้เลยโดยไม่ต้องสลับ key ของ workspace
+
+- หาด้วย ID (execution, scenario, configuration, test case ฯลฯ) จะลอง key ของ workspace ก่อน ถ้าได้ 401/403/404 จะลอง key ที่เหลือทีละตัว เจอแล้วจะบอก model ว่าเจอใน key ไหน หน้าในแชทที่เปิดจากผลนั้นก็จะใช้ key นั้นต่อ ถ้าหาเจอด้วย key ของ workspace ก็ยิงแค่ครั้งเดียวเหมือนเดิม
+- list และ search ระดับ org (`getAllTestCases`, `getOrgTestCaseSummary`, `searchOrgExecutionsWithFilter`, `countOrgExecutionsWithFilter`, `getOrgReports`, `getOrgScheduledTests` ฯลฯ ดู `ORG_WIDE` ใน `src/client.ts`) ใช้ key ของ workspace ท้ายผลจะบอก model ว่ามี key อื่นอะไรอีก ถ้าส่ง `apiKey: "all"` จะยิงทุก key พร้อมกันแล้วแยกผลตาม org แต่ละ org ได้ขนาดผลลัพธ์ `maxResponseChars` หารด้วยจำนวน key
+- `testable_showTests` แสดง test case ของ key เดียว เพราะหน้านั้นผูกกับ org เดียว แต่จะบอกว่า org อื่นมี test case ของ repo นี้ด้วยไหม
+- tool ที่เขียนข้อมูลไม่สลับ key เอง ใช้ key ของ workspace หรือ `apiKey` ที่ระบุเท่านั้น และไม่รับ `"all"` ถ้าได้ 401/403/404 จะ error บอก model ให้ลองใหม่โดยระบุ `apiKey`
+
+ทุก tool ที่เรียก Testable (ยกเว้น `testable_searchTools` กับ `testable_describeTools`) รับ argument `apiKey` เป็นชื่อ key ได้ เพื่อใช้เฉพาะ org นั้น เช่นบอกในแชทว่า "ดู execution 123 ของ Org B" model จะส่ง `apiKey: "Org B"` ไปกับ tool นั้น ส่วน key ของ workspace ไม่เปลี่ยน
+
+- ชื่อไม่สนตัวพิมพ์เล็กใหญ่ ถ้าไม่มี key ชื่อนั้น tool จะ error พร้อมรายชื่อ key ทั้งหมดให้ model เลือกใหม่ ส่วนชื่อ `all` สงวนไว้ ตั้งเป็นชื่อ key ไม่ได้
+- `testable_callTool` ใส่ `apiKey` ข้าง `toolName` ไม่ใช่ใน `arguments`
+- `testable_showTests` บอก model ว่ามี key อะไรบ้าง (`apiKeys`) และถ้าใช้ key อื่น จะบอก key ของ workspace ไว้ใน `workspaceApiKey` ด้วย
+- ถ้ามี key มากกว่าหนึ่งตัว กล่องยืนยันของ tool ที่เขียนข้อมูลจะบอกเสมอว่าจะเขียนลง key ไหน และข้อความตอนเรียก tool จะบอกชื่อ key ที่ส่งมาใน `apiKey`
+- ถ้าระบุ `apiKey` แล้วได้ HTTP 401/403/404 error จะบอก model ว่าใช้ key ไหนไป และมี key อื่นอะไรบ้าง (ไม่ลอง key อื่นเองเพราะระบุมาแล้ว)
+- หน้าที่เปิดจาก tool ที่ส่ง `apiKey` จะใช้ key นั้นต่อ ส่วน **in use** ในหน้านั้นยังหมายถึง key ของ workspace
+
 key จากเวอร์ชันก่อนที่มีแค่ตัวเดียวจะย้ายมาเป็น key ชื่อ `Default` ให้อัตโนมัติ
 
 **Testable: Open Dashboard** เปิดหน้าเดียวกันใน editor tab ได้ ไม่ต้องใช้ proposed API

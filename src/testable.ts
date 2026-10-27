@@ -183,6 +183,20 @@ export function latestLink<T extends { link?: RepoLink }>(entries: T[]): T | und
     .sort((a, b) => time(b.link?.lastRunAt) - time(a.link?.lastRunAt))[0];
 }
 
+/** The apiKey value that asks a read to look in every organization; no key may be named it. */
+export const EVERY_KEY = 'all';
+
+export function isEveryKey(name: string | undefined): boolean {
+  return name?.trim().toLowerCase() === EVERY_KEY;
+}
+
+/** The account a tool's apiKey argument names: an exact match, else the only one that matches ignoring case. */
+export function findAccount<T extends AccountRef>(accounts: T[], name: string): T | undefined {
+  const wanted = name.trim();
+  const loose = accounts.filter((a) => a.name.toLowerCase() === wanted.toLowerCase());
+  return accounts.find((a) => a.name === wanted) ?? (loose.length === 1 ? loose[0] : undefined);
+}
+
 /** The ID of the organization an API key belongs to, or undefined when it has no test cases yet. */
 export async function organizationId(t: Testable): Promise<number | undefined> {
   const cases = asList(await t.run('getAllTestCases'));

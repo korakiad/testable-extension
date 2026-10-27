@@ -27,6 +27,23 @@ export function unavailableReason(name: string): string | undefined {
   return catalog.unavailable.find((u) => u.name === name)?.reason;
 }
 
+/**
+ * Organization-wide lists and searches. With apiKey "all" the tools run these with every API key
+ * and return each organization's result; other reads look their IDs up one key at a time.
+ */
+export const ORG_WIDE = new Set([
+  'getAllTestCases',
+  'getOrgTestCaseSummary',
+  'searchOrgExecutionsWithFilter',
+  'countOrgExecutionsWithFilter',
+  'getOrgReports',
+  'getOrgScheduledTests',
+  'getTestRunnerSources',
+  'getOrg',
+  'listIntegrations',
+  'listVcsRoots',
+]);
+
 export function searchOperations(keywords: string[], limit = 20) {
   const terms = keywords.map((k) => k.toLowerCase()).filter(Boolean);
   return catalog.operations
