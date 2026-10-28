@@ -7,6 +7,10 @@
   "icon": "media/icon.png",
   "private": true,
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/korakiad/testable-extension.git"
+  },
   "engines": {
     "vscode": "^1.99.0"
   },
