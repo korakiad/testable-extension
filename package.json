@@ -2,7 +2,7 @@
   "name": "testable-tools",
   "displayName": "Testable Tools",
   "description": "Testable REST API as Copilot agent-mode tools with an interactive chat UI, mirroring the tools of Testable's hosted MCP server without using MCP.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "local",
   "icon": "media/icon.png",
   "private": true,
