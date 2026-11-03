@@ -1,121 +1,130 @@
 # Testable Tools (VS Code extension)
 
-Extension นี้ทำ Testable REST API ให้เป็น tool ใน Copilot agent mode โดยลอกชื่อและ schema มาจาก MCP server ของ Testable (`https://mcp.testable.io`) แต่**ไม่ใช้ MCP และไม่ใช้ `@modelcontextprotocol/sdk`** ตอน runtime ไม่มี dependency ใดๆ มีแค่ VS Code Language Model Tools API กับ `fetch` ไปที่ `https://api.testable.io`
+**English** · [ภาษาไทย](README.th.md)
 
-ผลของ tool กลุ่ม workflow แสดงเป็นหน้า UI ในแชทได้ (คล้าย MCP Apps) ผ่าน chat output renderer ของ VS Code ซึ่งยังเป็น proposed API ต้องเปิดก่อน ดูหัวข้อ [เปิด UI ในแชท](#เปิด-ui-ในแชท)
+This extension turns the Testable REST API into tools for Copilot agent mode. Tool names and schemas are copied from Testable's MCP server (`https://mcp.testable.io`), but it **does not use MCP or `@modelcontextprotocol/sdk`**. It has no runtime dependencies: only the VS Code Language Model Tools API and `fetch` calls to `https://api.testable.io`.
 
-## Tool ที่ Copilot เห็น
+Results of the workflow tools can render as pages in the chat (similar to MCP Apps) through VS Code's chat output renderer. That is still a proposed API and has to be enabled first, see [Enable the chat UI](#enable-the-chat-ui).
 
-### Workflow (มี UI ในแชท)
+## Tools Copilot sees
 
-| Tool | หน้าที่ |
+### Workflow (with chat UI)
+
+| Tool | What it does |
 |---|---|
-| `testable_showTests` | test case, scenario และ configuration ของ repo นี้ (กรองตาม git remote ถ้า API key อ่าน VCS root ได้) พร้อมบอกว่าใช้ key ไหน และ org อื่นมี test case ของ repo นี้ด้วยไหม |
-| `testable_showScenario` | settings, declared params, ไฟล์, repository และ configuration ของ scenario |
-| `testable_downloadExecution` | โหลด `logs.txt`, `failures.txt` (test ที่ fail พร้อม stack trace), `failed-tests.json`, `execution.json` และ output files ลง `.testable/executions/<id>/` ให้ agent อ่านต่อ |
-| `testable_pullScenarioFiles` | โหลดไฟล์ของ scenario ลง `.testable/scenarios/<id>-<name>/` (ไม่ทับไฟล์ที่แก้ในเครื่อง) |
-| `testable_pushScenarioFiles` | อัปโหลดไฟล์ที่แก้แล้วกลับขึ้นไป (update ไฟล์เดิม, create ไฟล์ใหม่, ไม่ลบ) |
-| `testable_updateScenarioSettings` | แก้ settings ของ scenario เช่น `chromedriverOnly`, `seleniumVersion`, `browsers.edge` (ชื่อ key ต้องมีอยู่แล้ว กันพิมพ์ผิด) |
-| `testable_setScenarioParams` | ตั้งหรือลบ scenario params (env var) ของ configuration |
-| `testable_updateRepository` | สลับ branch ที่ scenario ใช้ (`branch` ของ scenario ไม่ใช่ของ root) หรืออัปเดต token ของ VCS root ที่หมดอายุ |
+| `testable_showTests` | Test cases, scenarios and configurations of this repo (filtered by git remote if the API key can read VCS roots), with which key is in use and whether other orgs also have test cases for this repo |
+| `testable_showScenario` | A scenario's settings, declared params, files, repository and configurations |
+| `testable_downloadExecution` | Downloads `logs.txt`, `failures.txt` (failed tests with stack traces), `failed-tests.json`, `execution.json` and output files into `.testable/executions/<id>/` for the agent to read |
+| `testable_pullScenarioFiles` | Downloads a scenario's files into `.testable/scenarios/<id>-<name>/` (does not overwrite files edited locally) |
+| `testable_pushScenarioFiles` | Uploads edited files back (updates existing files, creates new ones, never deletes) |
+| `testable_updateScenarioSettings` | Edits scenario settings such as `chromedriverOnly`, `seleniumVersion`, `browsers.edge` (the key must already exist, to catch typos) |
+| `testable_setScenarioParams` | Sets or removes a configuration's scenario params (environment variables) |
+| `testable_updateRepository` | Switches the branch a scenario uses (the scenario's `branch`, not the root's) or updates an expired VCS root token |
 
-Tool ที่เขียนข้อมูลจะแสดงค่าก่อนและหลังให้ยืนยันก่อนเสมอ ส่วน token ของ VCS ใส่ในช่อง password ของ VS Code โดยตรง ไม่ผ่านแชท และจะถูกทดสอบกับ repo ก่อนบันทึก ถ้าทดสอบไม่ผ่าน (เช่น repo อยู่หลัง firewall ที่ต้องรันผ่าน self-hosted runner) เลือก Save Anyway ได้
+Tools that write always show the values before and after for confirmation first. VCS tokens are typed straight into a VS Code password box, never through the chat, and are tested against the repo before saving. If the test fails (for example, the repo is behind a firewall and has to be reached through a self-hosted runner), you can choose Save Anyway.
 
 ### Generic
 
-| Tool | หน้าที่ |
+| Tool | What it does |
 |---|---|
-| `testable_searchTools` | ค้นหา operation จาก keyword |
-| `testable_describeTools` | ดู schema เต็มของ operation |
-| `testable_callTool` | เรียก operation ไหนก็ได้ใน catalog (172 ตัว) |
-| `testable_<operation>` 12 ตัว | operation ที่ใช้บ่อย ประกาศตรงพร้อม schema |
+| `testable_searchTools` | Searches operations by keyword |
+| `testable_describeTools` | Shows an operation's full schema |
+| `testable_callTool` | Calls any operation in the catalog (172 of them) |
+| 12 `testable_<operation>` tools | Frequently used operations, declared directly with their schemas |
 
-Operation แบบ write (POST/PUT/DELETE) จะแสดงกล่องยืนยันพร้อม endpoint และ argument ก่อนส่ง
+Write operations (POST/PUT/DELETE) show a confirmation with the endpoint and arguments before sending.
 
-Mapping ของ argument เหมือนของ Testable: `path_x` ใส่ใน `:x` ของ path, `query_x` เป็น `?x=` และ field อื่นทั้งหมดเป็น JSON body
+Arguments are mapped the same way as Testable's: `path_x` fills `:x` in the path, `query_x` becomes `?x=`, and every other field goes into the JSON body.
 
-Testable ใส่ API key ไว้ใน URL ที่ส่งกลับมา (`...?key=...`) extension จะลบออกก่อนส่งข้อความให้ model
+Testable puts the API key in the URLs it returns (`...?key=...`). The extension removes it before passing the text to the model.
 
-## ติดตั้งและใช้งาน
+### Skill
 
-1. ติดตั้ง `testable-tools-<version>.vsix` ผ่าน Extensions → `...` → Install from VSIX (โหลดจาก GitHub Releases หรือ build เองด้วย `npm run package`)
-2. รันคำสั่ง **Testable: Add API Key** (key จะเก็บใน SecretStorage ของ VS Code)
-3. เปิด Copilot Chat ในโหมด Agent แล้วกดเปิด tool ที่ขึ้นต้นด้วย Testable
+`testable-execution-scenario` (VS Code 1.109 or later) is for when the user gives an execution or test case link (or ID) and wants to change what it runs, such as the branch, settings, params or files.
 
-### หลาย API key (หลาย org)
+- From an execution: Testable copies the scenario for every execution, and the execution's `scenarioId` is that read-only copy. Changes to the copy succeed but do nothing for later runs. The skill tells Copilot to get the real scenario from the configuration instead (`getTestConf` → `script.id`).
+- From a test case: Copilot lists the test case's scenarios (`getTestCaseScenarios`). If several fit, it asks whether to change one, several or all, and points out the ones that can't take the change (for example, a branch change on a scenario that isn't linked to a repository).
 
-เพิ่ม key ได้หลายตัวด้วย **Testable: Add API Key** ตอนเพิ่ม extension จะเช็ค key กับ Testable ก่อนแล้วให้ตั้งชื่อ (ค่าเริ่มต้นเป็น `Org <id>` เพราะ API key อ่านชื่อ org ไม่ได้)
+## Install and use
 
-แต่ละ workspace ใช้ key ได้ทีละตัว ถ้ามี key มากกว่าหนึ่งตัวและยังไม่ได้เลือกให้ workspace นี้ ตอนเรียก Testable ครั้งแรก extension จะเช็ค git remote ของ workspace กับทุก key แล้วเลือก org ที่มี test case ผูกกับ repo นี้และรันล่าสุด จากนั้นแจ้งว่าเลือก key ไหนเพราะอะไร
+1. Install `testable-tools-<version>.vsix` from Extensions → `...` → Install from VSIX (download it from GitHub Releases or build it with `npm run package`)
+2. Run **Testable: Add API Key** (the key is stored in VS Code's SecretStorage)
+3. Open Copilot Chat in Agent mode and turn on the tools that start with Testable
 
-- ชื่อ key ที่ workspace ใช้แสดงที่ status bar ด้านล่าง (แสดงเมื่อมีมากกว่าหนึ่ง key) กดเพื่อเปลี่ยน
-- **Testable: Select API Key** แสดงทุก key พร้อม test case ที่ผูกกับ repo นี้และวันเวลาที่รันล่าสุด เลือก key ให้ workspace นี้ เปลี่ยนชื่อ หรือลบได้จากรายการนี้
-- หน้า Testable มีส่วน **API keys · this repo** ที่บอกเหมือนกัน ถ้า org อื่นมี test case ของ repo นี้ที่รันใหม่กว่า (เช่นเคยสร้างไว้ผิด org) จะขึ้นเตือนพร้อมปุ่ม Use
-- หน้าที่เปิดค้างไว้ในแชทหรือ dashboard จะใช้ key เดิมที่โหลดหน้านั้นมา แม้ workspace จะเปลี่ยนไปใช้ key อื่นแล้ว
-- **Testable: Remove API Key** ลบ key ออก
+### Multiple API keys (multiple orgs)
 
-#### ดูของ org อื่นในแชท
+Add as many keys as you need with **Testable: Add API Key**. The extension checks each key with Testable and asks for a name (the default is `Org <id>`, because an API key cannot read the org's name).
 
-ปกติทุก tool ใช้ key ของ workspace ซึ่งก็คือ org ของ repo ที่เปิดอยู่ ถ้าอยาก investigate org อื่นก็ถามในแชทได้เลยโดยไม่ต้องสลับ key ของ workspace
+Each workspace uses one key at a time. If there is more than one key and none has been chosen for this workspace, the first Testable call checks the workspace's git remote against every key and picks the org that has test cases bound to this repo with the latest run, then tells you which key it picked and why.
 
-- หาด้วย ID (execution, scenario, configuration, test case ฯลฯ) จะลอง key ของ workspace ก่อน ถ้าได้ 401/403/404 จะลอง key ที่เหลือทีละตัว เจอแล้วจะบอก model ว่าเจอใน key ไหน หน้าในแชทที่เปิดจากผลนั้นก็จะใช้ key นั้นต่อ ถ้าหาเจอด้วย key ของ workspace ก็ยิงแค่ครั้งเดียวเหมือนเดิม
-- list และ search ระดับ org (`getAllTestCases`, `getOrgTestCaseSummary`, `searchOrgExecutionsWithFilter`, `countOrgExecutionsWithFilter`, `getOrgReports`, `getOrgScheduledTests` ฯลฯ ดู `ORG_WIDE` ใน `src/client.ts`) ใช้ key ของ workspace ท้ายผลจะบอก model ว่ามี key อื่นอะไรอีก ถ้าส่ง `apiKey: "all"` จะยิงทุก key พร้อมกันแล้วแยกผลตาม org แต่ละ org ได้ขนาดผลลัพธ์ `maxResponseChars` หารด้วยจำนวน key
-- `testable_showTests` แสดง test case ของ key เดียว เพราะหน้านั้นผูกกับ org เดียว แต่จะบอกว่า org อื่นมี test case ของ repo นี้ด้วยไหม
-- tool ที่เขียนข้อมูลไม่สลับ key เอง ใช้ key ของ workspace หรือ `apiKey` ที่ระบุเท่านั้น และไม่รับ `"all"` ถ้าได้ 401/403/404 จะ error บอก model ให้ลองใหม่โดยระบุ `apiKey`
+- The workspace's key name shows in the status bar (when there is more than one key). Click it to change
+- **Testable: Select API Key** lists every key with the test cases bound to this repo and when they last ran. Choose the workspace's key, rename a key or remove one from this list
+- The Testable page has an **API keys · this repo** section with the same information. If another org has test cases of this repo with a newer run (for example, ones created in the wrong org earlier), it shows a warning with a Use button
+- Pages left open in the chat or the dashboard keep the key they were loaded with, even after the workspace switches to another key
+- **Testable: Remove API Key** removes a key
 
-ทุก tool ที่เรียก Testable (ยกเว้น `testable_searchTools` กับ `testable_describeTools`) รับ argument `apiKey` เป็นชื่อ key ได้ เพื่อใช้เฉพาะ org นั้น เช่นบอกในแชทว่า "ดู execution 123 ของ Org B" model จะส่ง `apiKey: "Org B"` ไปกับ tool นั้น ส่วน key ของ workspace ไม่เปลี่ยน
+#### Looking at other orgs from the chat
 
-- ชื่อไม่สนตัวพิมพ์เล็กใหญ่ ถ้าไม่มี key ชื่อนั้น tool จะ error พร้อมรายชื่อ key ทั้งหมดให้ model เลือกใหม่ ส่วนชื่อ `all` สงวนไว้ ตั้งเป็นชื่อ key ไม่ได้
-- `testable_callTool` ใส่ `apiKey` ข้าง `toolName` ไม่ใช่ใน `arguments`
-- `testable_showTests` บอก model ว่ามี key อะไรบ้าง (`apiKeys`) และถ้าใช้ key อื่น จะบอก key ของ workspace ไว้ใน `workspaceApiKey` ด้วย
-- ถ้ามี key มากกว่าหนึ่งตัว กล่องยืนยันของ tool ที่เขียนข้อมูลจะบอกเสมอว่าจะเขียนลง key ไหน และข้อความตอนเรียก tool จะบอกชื่อ key ที่ส่งมาใน `apiKey`
-- ถ้าระบุ `apiKey` แล้วได้ HTTP 401/403/404 error จะบอก model ว่าใช้ key ไหนไป และมี key อื่นอะไรบ้าง (ไม่ลอง key อื่นเองเพราะระบุมาแล้ว)
-- หน้าที่เปิดจาก tool ที่ส่ง `apiKey` จะใช้ key นั้นต่อ ส่วน **in use** ในหน้านั้นยังหมายถึง key ของ workspace
+By default every tool uses the workspace's key, which is the org of the open repo. To investigate another org, ask in the chat. There is no need to switch the workspace's key.
 
-key จากเวอร์ชันก่อนที่มีแค่ตัวเดียวจะย้ายมาเป็น key ชื่อ `Default` ให้อัตโนมัติ
+- Lookups by ID (execution, scenario, configuration, test case and so on) try the workspace's key first. On 401/403/404 they try the other keys one at a time. When one finds it, the model is told which key, and chat pages opened from that result keep using that key. If the workspace's key finds it, it is still a single request
+- Org-wide lists and searches (`getAllTestCases`, `getOrgTestCaseSummary`, `searchOrgExecutionsWithFilter`, `countOrgExecutionsWithFilter`, `getOrgReports`, `getOrgScheduledTests` and others, see `ORG_WIDE` in `src/client.ts`) use the workspace's key, and the end of the result tells the model which other keys exist. `apiKey: "all"` queries every key at once and groups the results by org. Each org gets `maxResponseChars` divided by the number of keys
+- `testable_showTests` shows the test cases of one key, because the page belongs to one org, but says whether other orgs also have test cases of this repo
+- Tools that write never switch keys on their own. They use the workspace's key or the given `apiKey` only, and do not accept `"all"`. On 401/403/404 they return an error that tells the model to retry with `apiKey`
 
-**Testable: Open Dashboard** เปิดหน้าเดียวกันใน editor tab ได้ ไม่ต้องใช้ proposed API
+Every tool that calls Testable (except `testable_searchTools` and `testable_describeTools`) accepts an `apiKey` argument with a key name, to use that org for that call only. For example, ask in the chat "show execution 123 in Org B" and the model passes `apiKey: "Org B"` to the tool. The workspace's key does not change.
 
-Settings: `testable.apiUrl` (ค่าเริ่มต้น `https://api.testable.io`), `testable.maxResponseChars` (ค่าเริ่มต้น 60000) และ `testable.localFolder` (ค่าเริ่มต้น `.testable` ในโฟลเดอร์ workspace แรก มี `.gitignore` ให้อัตโนมัติ)
+- Names are case-insensitive. If no key has that name, the tool returns an error listing every key so the model can pick again. The name `all` is reserved and cannot be used for a key
+- With `testable_callTool`, put `apiKey` next to `toolName`, not inside `arguments`
+- `testable_showTests` tells the model which keys exist (`apiKeys`), and when it uses another key, it gives the workspace's key in `workspaceApiKey`
+- With more than one key, the confirmation of a tool that writes always says which key it writes with, and the tool call message names the key passed in `apiKey`
+- If `apiKey` is given and the call gets HTTP 401/403/404, the error tells the model which key was used and which other keys exist (it does not try other keys, since one was given)
+- Pages opened from a tool given `apiKey` keep using that key, while **in use** on those pages still marks the workspace's key
 
-## เปิด UI ในแชท
+A single key from earlier versions is moved to a key named `Default` automatically.
 
-VS Code Stable ให้ใช้ proposed API เฉพาะ extension ที่ระบุไว้เท่านั้น แม้จะรันใน extension development mode ก็ตาม
+**Testable: Open Dashboard** opens the same page in an editor tab, without the proposed API.
 
-1. Command Palette → **Preferences: Configure Runtime Arguments** (เปิด `argv.json`)
-2. เพิ่ม `"enable-proposed-api": ["local.testable-tools"]`
-3. ปิด VS Code ทุกหน้าต่างแล้วเปิดใหม่
+Settings: `testable.apiUrl` (default `https://api.testable.io`), `testable.maxResponseChars` (default 60000) and `testable.localFolder` (default `.testable` in the first workspace folder, which gets a `.gitignore` automatically).
 
-ถ้ายังไม่ได้เปิด tool จะยังใช้ได้ตามปกติแต่ตอบเป็นข้อความอย่างเดียว และ extension จะแจ้งเตือนครั้งเดียวพร้อมปุ่มเปิด `argv.json` ใน VS Code บางเวอร์ชัน proposed API อาจเปลี่ยน ถ้า UI ในแชทหายไปหลังอัปเดต ให้ดู log ใน Output → Testable Tools
+## Enable the chat UI
 
-## ที่ใช้ไม่ได้ (25 ตัว)
+VS Code Stable allows proposed APIs only for the extensions listed explicitly, even in extension development mode.
 
-Tool เหล่านี้ทำงานอยู่ใน MCP server ของ Testable เอง (`/internal/*`) ไม่มี REST endpoint สาธารณะ:
+1. Command Palette → **Preferences: Configure Runtime Arguments** (opens `argv.json`)
+2. Add `"enable-proposed-api": ["local.testable-tools"]`
+3. Close every VS Code window and open it again
+
+Until then the tools still work but answer in text only, and the extension shows a one-time notification with a button that opens `argv.json`. The proposed API may change between VS Code versions. If the chat UI disappears after an update, check the log in Output → Testable Tools.
+
+## Not available (25 tools)
+
+These tools run inside Testable's own MCP server (`/internal/*`) and have no public REST endpoint:
 `run_smoke_test`, `browser_*`, `make_http_request`, attachment/conversation tools, `resolve_openfin_version`, `describe_tools`, `search_tools`
-ส่วน `uploadScenarioFiles` และ `replaceScenarioFiles` ใช้ `createScenarioFileFromContents` หรือ `updateScenarioFileContents` แทน
-`encode_base64` และ `decode_base64` ทำงานใน extension เอง
+Instead of `uploadScenarioFiles` and `replaceScenarioFiles`, use `createScenarioFileFromContents` or `updateScenarioFileContents`.
+`encode_base64` and `decode_base64` run inside the extension.
 
-API key ของ Testable อ่านรายการ `/vcs-roots` ไม่ได้ (HTTP 401) แต่อ่าน root ทีละตัวได้ การกรองตาม git remote จึงดูจาก VCS root ที่ scenario ผูกไว้ ถ้าไม่มี scenario ไหนผูกกับ repo ของ workspace จะแสดงทุก test case
+Testable API keys cannot list `/vcs-roots` (HTTP 401) but can read one root at a time, so filtering by git remote goes through the VCS root each scenario is bound to. If no scenario is bound to the workspace's repo, every test case is shown.
 
-## อัปเดต catalog เมื่อ Testable เพิ่ม tool
+## Update the catalog when Testable adds tools
 
 ```sh
-npm run discover   # ใช้ TESTABLE_API_KEY ใน .env ดึง tools/list + describe_tools -> discovery/tools.json
-npm run generate   # สร้าง src/catalog.json และ languageModelTools ใน package.json
+npm run discover   # uses TESTABLE_API_KEY in .env to fetch tools/list + describe_tools -> discovery/tools.json
+npm run generate   # builds src/catalog.json and languageModelTools in package.json
 npm run compile
-npm run smoke      # ยิง GET แบบอ่านอย่างเดียวไปที่ API จริงด้วย key ใน .env (ไฟล์ที่โหลดลง temp แล้วลบทิ้ง)
+npm run smoke      # read-only GETs against the real API with the key in .env (downloaded files go to temp and are deleted)
 npm run package
 ```
 
-รายชื่อ tool ที่ประกาศตรงแก้ได้ที่ `DIRECT` ใน `scripts/generate.mjs` ส่วนคำอธิบาย tool กลุ่ม workflow อยู่ใน `workflowTools` ไฟล์เดียวกัน
+The tools declared directly are listed in `DIRECT` in `scripts/generate.mjs`. Descriptions of the workflow tools are in `workflowTools` in the same file.
 
-## ออกเวอร์ชันใหม่
+## Releasing
 
-PR ไม่ต้องแก้ `version` ใน `package.json` แค่เขียนสิ่งที่เปลี่ยนไว้ใต้ `Unreleased` ใน `CHANGELOG.md` เลขเวอร์ชันเปลี่ยนตอนจะแจก `.vsix` ใหม่เท่านั้น เพื่อให้หนึ่งเลขตรงกับไฟล์ `.vsix` หนึ่งไฟล์ ช่วง 0.x ขึ้น minor เมื่อมีความสามารถใหม่หรือพฤติกรรมเปลี่ยน และขึ้น patch เมื่อแก้บั๊กอย่างเดียว
+PRs do not change `version` in `package.json`. Describe the changes under `Unreleased` in `CHANGELOG.md` instead. The version changes only when a new `.vsix` is handed out, so each version number matches one `.vsix` file. During 0.x, bump the minor version for new features or changed behavior, and the patch version for bug fixes only.
 
-ทำบน `main`:
+On `main`:
 
-1. เปลี่ยนหัวข้อ `Unreleased` ใน `CHANGELOG.md` เป็นเลขเวอร์ชันใหม่กับวันที่ แล้ว commit (`npm version` ต้องการ working tree ที่ไม่มีไฟล์ค้าง)
-2. `npm version minor` หรือ `npm version patch` จะแก้ `package.json` และ `package-lock.json` แล้ว commit และสร้าง tag `v<version>` ให้
-3. `npm run package` ได้ `testable-tools-<version>.vsix`
-4. `git push --follow-tags` แล้วสร้าง GitHub Release ของ tag นั้นพร้อมแนบไฟล์ `.vsix`
+1. Rename the `Unreleased` heading in `CHANGELOG.md` to the new version and date, then commit (`npm version` needs a clean working tree)
+2. `npm version minor` or `npm version patch` updates `package.json` and `package-lock.json`, commits, and creates the tag `v<version>`
+3. `npm run package` produces `testable-tools-<version>.vsix`
+4. `git push --follow-tags`, then create a GitHub Release for that tag with the `.vsix` attached

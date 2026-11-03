@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import {
   ORG_WIDE,
   Operation,
+  applyDefaults,
   buildRequest,
   describeOperations,
   findOperation,
@@ -259,7 +260,8 @@ async function request(
   token: vscode.CancellationToken
 ): Promise<string> {
   const key = await accounts.key(account);
-  const req = buildRequest(op, args, vscode.workspace.getConfiguration('testable').get<string>('apiUrl', 'https://api.testable.io'));
+  const filled = applyDefaults(op, args);
+  const req = buildRequest(op, filled.args, vscode.workspace.getConfiguration('testable').get<string>('apiUrl', 'https://api.testable.io'));
   const abort = new AbortController();
   const sub = token.onCancellationRequested(() => abort.abort());
   try {
@@ -281,7 +283,7 @@ async function request(
     if (body.length > max) {
       body = `${body.slice(0, max)}\n…[truncated ${body.length - max} of ${body.length} characters; narrow the request with limit/offset/filter arguments]`;
     }
-    return `HTTP ${res.status}\n${body}`;
+    return `HTTP ${res.status}\n${body}${filled.note ? `\n\n${filled.note}` : ''}`;
   } finally {
     sub.dispose();
   }

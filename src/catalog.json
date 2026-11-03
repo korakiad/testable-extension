@@ -4259,7 +4259,7 @@
       "access": "read",
       "method": "GET",
       "path": "/scripts/:scriptId",
-      "description": "[read] GET /scripts/:scriptId — Get a scenario by ID",
+      "description": "[read] GET /scripts/:scriptId — Get a scenario by ID\n\nIn this extension up default to false to keep the response small; pass query_<name>: true for what you need. The result says what was left out.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4273,7 +4273,7 @@
           },
           "query_up": {
             "type": "boolean",
-            "description": "Include parent entities"
+            "description": "Include parent entities. Defaults to false here; true adds the parent test case with its configurations."
           },
           "query_includeTests": {
             "type": "boolean",
@@ -4287,6 +4287,9 @@
         "required": [
           "path_scriptId"
         ]
+      },
+      "offByDefault": {
+        "query_up": "the parent test case with its configurations"
       },
       "kind": "rest"
     },
@@ -4716,7 +4719,7 @@
       "access": "read",
       "method": "GET",
       "path": "/test-cases/:testCase",
-      "description": "[read] GET /test-cases/:testCase — Get a test case by ID",
+      "description": "[read] GET /test-cases/:testCase — Get a test case by ID\n\nIn this extension up, includeMetricDefs default to false to keep the response small; pass query_<name>: true for what you need. The result says what was left out.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4730,11 +4733,11 @@
           },
           "query_up": {
             "type": "boolean",
-            "description": "Include success details"
+            "description": "Include success details. Defaults to false here; true adds the organization object."
           },
           "query_includeMetricDefs": {
             "type": "boolean",
-            "description": "Include metric definitions"
+            "description": "Include metric definitions. Defaults to false here; true adds the metric definitions (getTestCaseMetricDefs also returns them)."
           },
           "query_includeRunning": {
             "type": "boolean",
@@ -4761,6 +4764,10 @@
         "required": [
           "path_testCase"
         ]
+      },
+      "offByDefault": {
+        "query_up": "the organization object",
+        "query_includeMetricDefs": "the metric definitions (getTestCaseMetricDefs also returns them)"
       },
       "kind": "rest"
     },
@@ -4915,7 +4922,7 @@
       "access": "read",
       "method": "GET",
       "path": "/test-confs/:conf",
-      "description": "[read] GET /test-confs/:conf — Get a test configuration by ID",
+      "description": "[read] GET /test-confs/:conf — Get a test configuration by ID\n\nIn this extension up, includeLatestExecution default to false to keep the response small; pass query_<name>: true for what you need. The result says what was left out.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4937,7 +4944,7 @@
           },
           "query_up": {
             "type": "boolean",
-            "description": "Include success details"
+            "description": "Include success details. Defaults to false here; true adds the parent test case with its configurations."
           },
           "query_includeRunning": {
             "type": "boolean",
@@ -4945,7 +4952,7 @@
           },
           "query_includeLatestExecution": {
             "type": "boolean",
-            "description": "Include latest execution"
+            "description": "Include latest execution. Defaults to false here; true adds the latest execution in full (getTestConfExecutions lists executions too)."
           },
           "query_granularity": {
             "type": "string",
@@ -4960,6 +4967,10 @@
         "required": [
           "path_conf"
         ]
+      },
+      "offByDefault": {
+        "query_up": "the parent test case with its configurations",
+        "query_includeLatestExecution": "the latest execution in full (getTestConfExecutions lists executions too)"
       },
       "kind": "rest"
     },
@@ -5270,7 +5281,7 @@
       "access": "read",
       "method": "GET",
       "path": "/test-confs/:conf/executions",
-      "description": "[read] GET /test-confs/:conf/executions — Get executions for a test configuration",
+      "description": "[read] GET /test-confs/:conf/executions — Get executions for a test configuration\n\nIn this extension up, includeScript, includeSummary, down default to false to keep the response small; pass query_<name>: true for what you need. The result says what was left out.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5280,19 +5291,19 @@
           },
           "query_down": {
             "type": "boolean",
-            "description": "Include failure details"
+            "description": "Include failure details. Defaults to false here; true adds per-region details (chunks, agents, region summaries)."
           },
           "query_up": {
             "type": "boolean",
-            "description": "Include success details"
+            "description": "Include success details. Defaults to false here; true adds the full test configuration (its test case, scenario, scriptParams and settings)."
           },
           "query_includeScript": {
             "type": "boolean",
-            "description": "Include script details"
+            "description": "Include script details. Defaults to false here; true adds the scenario (script) object."
           },
           "query_includeSummary": {
             "type": "boolean",
-            "description": "Include execution summary"
+            "description": "Include execution summary. Defaults to false here; true adds the aggregated metrics summary (getExecutionSummary also returns it)."
           },
           "query_offset": {
             "type": "integer",
@@ -5323,6 +5334,12 @@
         "required": [
           "path_conf"
         ]
+      },
+      "offByDefault": {
+        "query_up": "the full test configuration (its test case, scenario, scriptParams and settings)",
+        "query_includeScript": "the scenario (script) object",
+        "query_includeSummary": "the aggregated metrics summary (getExecutionSummary also returns it)",
+        "query_down": "per-region details (chunks, agents, region summaries)"
       },
       "kind": "rest"
     },
@@ -5535,7 +5552,7 @@
       "access": "read",
       "method": "GET",
       "path": "/executions/:executionId",
-      "description": "[read] GET /executions/:executionId — Retrieves detailed information about a test execution including configuration, regions, \nmetrics summary, and status. If the `completed` field is not `true`, the test is still running.\n\n**Common Patterns:**\n- Poll with `includeSummary=false` while test is running to reduce payload size\n- Use `baseline` parameter to compare two test runs\n- Set `includeChildren=true` for distributed tests to see per-region breakdown",
+      "description": "[read] GET /executions/:executionId — Retrieves detailed information about a test execution including configuration, regions, \nmetrics summary, and status. If the `completed` field is not `true`, the test is still running.\n\n**Common Patterns:**\n- Poll with `includeSummary=false` while test is running to reduce payload size\n- Use `baseline` parameter to compare two test runs\n- Set `includeChildren=true` for distributed tests to see per-region breakdown\n\nIn this extension up, includeScript, includeSummary, down default to false to keep the response small; pass query_<name>: true for what you need. The result says what was left out.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5545,19 +5562,19 @@
           },
           "query_down": {
             "type": "boolean",
-            "description": "Include execution region/chunk information"
+            "description": "Include execution region/chunk information. Defaults to false here; true adds per-region details (chunks, agents, region summaries)."
           },
           "query_up": {
             "type": "boolean",
-            "description": "Include parent configuration details"
+            "description": "Include parent configuration details. Defaults to false here; true adds the full test configuration (its test case, scenario, scriptParams and settings)."
           },
           "query_includeScript": {
             "type": "boolean",
-            "description": "Include test script/scenario information"
+            "description": "Include test script/scenario information. Defaults to false here; true adds the scenario (script) object."
           },
           "query_includeSummary": {
             "type": "boolean",
-            "description": "Include aggregated metrics summary"
+            "description": "Include aggregated metrics summary. Defaults to false here; true adds the aggregated metrics summary (getExecutionSummary also returns it)."
           },
           "query_includeAssignments": {
             "type": "boolean",
@@ -5590,6 +5607,12 @@
         "required": [
           "path_executionId"
         ]
+      },
+      "offByDefault": {
+        "query_up": "the full test configuration (its test case, scenario, scriptParams and settings)",
+        "query_includeScript": "the scenario (script) object",
+        "query_includeSummary": "the aggregated metrics summary (getExecutionSummary also returns it)",
+        "query_down": "per-region details (chunks, agents, region summaries)"
       },
       "kind": "rest"
     },

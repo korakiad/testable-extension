@@ -1,6 +1,21 @@
 # Changelog
 
-บันทึกสิ่งที่เปลี่ยนในแต่ละเวอร์ชัน เลขเวอร์ชันใช้ [Semantic Versioning](https://semver.org/) วิธีออกเวอร์ชันดูที่ [README](README.md#ออกเวอร์ชันใหม่)
+บันทึกสิ่งที่เปลี่ยนในแต่ละเวอร์ชัน เลขเวอร์ชันใช้ [Semantic Versioning](https://semver.org/) วิธีออกเวอร์ชันดูที่ [README](README.th.md#ออกเวอร์ชันใหม่)
+
+## Unreleased
+
+### เปลี่ยน
+
+- README เป็นภาษาอังกฤษ (หน้า extension ใน VS Code แสดงไฟล์นี้) ฉบับภาษาไทยอยู่ที่ `README.th.md`
+- tool ปิด flag ที่ทำให้ผลลัพธ์บวมไว้ก่อน ถ้า model ไม่ได้ส่งมา ท้ายผลลัพธ์บอกว่าตัดอะไรออกและส่ง flag ไหนเป็น `true` เพื่อเอากลับมา (การเรียกภายใน extension เช่น `testable_downloadExecution` ยังได้ข้อมูลเต็มเหมือนเดิม)
+  - `getExecution`, `getTestConfExecutions`: `up`, `down`, `includeScript`, `includeSummary` (execution หนึ่งตัว 58 KB → 4 KB)
+  - `getScenario`: `up` (27 KB → 4 KB)
+  - `getTestConf`: `up`, `includeLatestExecution` (49 KB → 5 KB)
+  - `getTestCase`: `up`, `includeMetricDefs` (49 KB → 29 KB)
+
+### เพิ่ม
+
+- Copilot skill `testable-execution-scenario` (ต้องใช้ VS Code 1.109 ขึ้นไป) บอกว่า `scenarioId` ของ execution เป็นสำเนา scenario แบบอ่านอย่างเดียวที่ Testable ทำแยกให้แต่ละรอบรัน แก้ได้แต่ไม่มีผลกับรอบถัดไป และบอกวิธีหา scenario ตัวจริงจาก configuration (`getTestConf` → `script.id`) ก่อนเปลี่ยน branch, setting, param หรือไฟล์ ถ้า user ให้ link ของ test case มา จะดึงรายชื่อ scenario แล้วถามว่าจะเปลี่ยนตัวไหน หลายตัว หรือทั้งหมด
 
 ## 0.2.0 — 2026-10-28
 
