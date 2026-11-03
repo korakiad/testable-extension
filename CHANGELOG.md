@@ -1,6 +1,12 @@
 # Changelog
 
-บันทึกสิ่งที่เปลี่ยนในแต่ละเวอร์ชัน เลขเวอร์ชันใช้ [Semantic Versioning](https://semver.org/) วิธีออกเวอร์ชันดูที่ [README](README.md#ออกเวอร์ชันใหม่)
+บันทึกสิ่งที่เปลี่ยนในแต่ละเวอร์ชัน เลขเวอร์ชันใช้ [Semantic Versioning](https://semver.org/) วิธีออกเวอร์ชันดูที่ [README](README.th.md#ออกเวอร์ชันใหม่)
+
+## Unreleased
+
+### เปลี่ยน
+
+- README เป็นภาษาอังกฤษ (หน้า extension ใน VS Code แสดงไฟล์นี้) ฉบับภาษาไทยอยู่ที่ `README.th.md`
 
 ## 0.2.0 — 2026-10-28
 
