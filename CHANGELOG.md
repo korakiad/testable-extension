@@ -7,6 +7,11 @@
 ### เปลี่ยน
 
 - README เป็นภาษาอังกฤษ (หน้า extension ใน VS Code แสดงไฟล์นี้) ฉบับภาษาไทยอยู่ที่ `README.th.md`
+- tool ปิด flag ที่ทำให้ผลลัพธ์บวมไว้ก่อน ถ้า model ไม่ได้ส่งมา ท้ายผลลัพธ์บอกว่าตัดอะไรออกและส่ง flag ไหนเป็น `true` เพื่อเอากลับมา (การเรียกภายใน extension เช่น `testable_downloadExecution` ยังได้ข้อมูลเต็มเหมือนเดิม)
+  - `getExecution`, `getTestConfExecutions`: `up`, `down`, `includeScript`, `includeSummary` (execution หนึ่งตัว 58 KB → 4 KB)
+  - `getScenario`: `up` (27 KB → 4 KB)
+  - `getTestConf`: `up`, `includeLatestExecution` (49 KB → 5 KB)
+  - `getTestCase`: `up`, `includeMetricDefs` (49 KB → 29 KB)
 
 ## 0.2.0 — 2026-10-28
 

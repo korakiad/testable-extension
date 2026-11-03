@@ -35,6 +35,16 @@ const apiUrl = env.TESTABLE_API_URL ?? 'https://api.testable.io';
   assert.equal(del.body, '{"tagIds":[9]}');
 
   assert.throws(() => buildRequest(findOperation('getExecution'), {}, apiUrl), /path_executionId/);
+
+  // getExecution leaves the bulky parts out unless asked, and says how to get them back.
+  const slim = client.applyDefaults(findOperation('getExecution'), { path_executionId: 5, query_includeSummary: true });
+  assert.equal(
+    buildRequest(findOperation('getExecution'), slim.args, apiUrl).url,
+    `${apiUrl}/executions/5?includeSummary=true&up=false&includeScript=false&down=false`
+  );
+  assert.match(slim.note, /query_up: true/);
+  assert.doesNotMatch(slim.note, /query_includeSummary/);
+  assert.equal(client.applyDefaults(findOperation('getTestCaseConfs'), { path_testCaseId: 1 }).note, undefined);
   assert.equal(findOperation('searchOrgExecutionsWithFilter').access, 'read');
   assert.equal(findOperation('startExecution').access, 'write');
 

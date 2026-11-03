@@ -10,6 +10,21 @@ export interface Operation {
   path: string;
   description: string;
   inputSchema: { type: 'object'; properties?: Record<string, unknown>; required?: string[] };
+  /** Query flags the tools send as false unless the model passes them, each with what true adds back. */
+  offByDefault?: Record<string, string>;
+}
+
+/**
+ * Fills in an operation's offByDefault flags the model left out, and says what they left out
+ * and how to get it back (undefined when nothing was left out).
+ */
+export function applyDefaults(op: Operation, args: Record<string, unknown>): { args: Record<string, unknown>; note?: string } {
+  const off = Object.entries(op.offByDefault ?? {}).filter(([k]) => args[k] === undefined || args[k] === null);
+  if (!off.length) return { args };
+  return {
+    args: { ...args, ...Object.fromEntries(off.map(([k]) => [k, false])) },
+    note: `[Left out to keep this response small; pass these to ${op.name} to get them: ${off.map(([k, what]) => `${k}: true for ${what}`).join('; ')}.]`,
+  };
 }
 
 export interface Catalog {

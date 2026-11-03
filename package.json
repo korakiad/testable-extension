@@ -494,7 +494,7 @@
           "read"
         ],
         "userDescription": "[read] GET /test-cases/:testCase",
-        "modelDescription": "[read] GET /test-cases/:testCase — Get a test case by ID\n\nOther Testable operations named in this description can be run with testable_callTool, except run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools.",
+        "modelDescription": "[read] GET /test-cases/:testCase — Get a test case by ID\n\nIn this extension up, includeMetricDefs default to false to keep the response small; pass query_<name>: true for what you need. The result says what was left out.\n\nOther Testable operations named in this description can be run with testable_callTool, except run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -508,11 +508,11 @@
             },
             "query_up": {
               "type": "boolean",
-              "description": "Include success details"
+              "description": "Include success details. Defaults to false here; true adds the organization object."
             },
             "query_includeMetricDefs": {
               "type": "boolean",
-              "description": "Include metric definitions"
+              "description": "Include metric definitions. Defaults to false here; true adds the metric definitions (getTestCaseMetricDefs also returns them)."
             },
             "query_includeRunning": {
               "type": "boolean",
@@ -633,7 +633,7 @@
           "read"
         ],
         "userDescription": "[read] GET /test-confs/:conf",
-        "modelDescription": "[read] GET /test-confs/:conf — Get a test configuration by ID\n\nOther Testable operations named in this description can be run with testable_callTool, except run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools.",
+        "modelDescription": "[read] GET /test-confs/:conf — Get a test configuration by ID\n\nIn this extension up, includeLatestExecution default to false to keep the response small; pass query_<name>: true for what you need. The result says what was left out.\n\nOther Testable operations named in this description can be run with testable_callTool, except run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -655,7 +655,7 @@
             },
             "query_up": {
               "type": "boolean",
-              "description": "Include success details"
+              "description": "Include success details. Defaults to false here; true adds the parent test case with its configurations."
             },
             "query_includeRunning": {
               "type": "boolean",
@@ -663,7 +663,7 @@
             },
             "query_includeLatestExecution": {
               "type": "boolean",
-              "description": "Include latest execution"
+              "description": "Include latest execution. Defaults to false here; true adds the latest execution in full (getTestConfExecutions lists executions too)."
             },
             "query_granularity": {
               "type": "string",
@@ -698,7 +698,7 @@
           "read"
         ],
         "userDescription": "[read] GET /test-confs/:conf/executions",
-        "modelDescription": "[read] GET /test-confs/:conf/executions — Get executions for a test configuration\n\nOther Testable operations named in this description can be run with testable_callTool, except run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools.",
+        "modelDescription": "[read] GET /test-confs/:conf/executions — Get executions for a test configuration\n\nIn this extension up, includeScript, includeSummary, down default to false to keep the response small; pass query_<name>: true for what you need. The result says what was left out.\n\nOther Testable operations named in this description can be run with testable_callTool, except run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -708,19 +708,19 @@
             },
             "query_down": {
               "type": "boolean",
-              "description": "Include failure details"
+              "description": "Include failure details. Defaults to false here; true adds per-region details (chunks, agents, region summaries)."
             },
             "query_up": {
               "type": "boolean",
-              "description": "Include success details"
+              "description": "Include success details. Defaults to false here; true adds the full test configuration (its test case, scenario, scriptParams and settings)."
             },
             "query_includeScript": {
               "type": "boolean",
-              "description": "Include script details"
+              "description": "Include script details. Defaults to false here; true adds the scenario (script) object."
             },
             "query_includeSummary": {
               "type": "boolean",
-              "description": "Include execution summary"
+              "description": "Include execution summary. Defaults to false here; true adds the aggregated metrics summary (getExecutionSummary also returns it)."
             },
             "query_offset": {
               "type": "integer",
@@ -771,7 +771,7 @@
           "read"
         ],
         "userDescription": "[read] GET /executions/:executionId",
-        "modelDescription": "[read] GET /executions/:executionId — Retrieves detailed information about a test execution including configuration, regions, \nmetrics summary, and status. If the `completed` field is not `true`, the test is still running.\n\n**Common Patterns:**\n- Poll with `includeSummary=false` while test is running to reduce payload size\n- Use `baseline` parameter to compare two test runs\n- Set `includeChildren=true` for distributed tests to see per-region breakdown\n\nOther Testable operations named in this description can be run with testable_callTool, except run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools.",
+        "modelDescription": "[read] GET /executions/:executionId — Retrieves detailed information about a test execution including configuration, regions, \nmetrics summary, and status. If the `completed` field is not `true`, the test is still running.\n\n**Common Patterns:**\n- Poll with `includeSummary=false` while test is running to reduce payload size\n- Use `baseline` parameter to compare two test runs\n- Set `includeChildren=true` for distributed tests to see per-region breakdown\n\nIn this extension up, includeScript, includeSummary, down default to false to keep the response small; pass query_<name>: true for what you need. The result says what was left out.\n\nOther Testable operations named in this description can be run with testable_callTool, except run_smoke_test, browser_*, make_http_request and the AI-chat attachment/conversation tools.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -781,19 +781,19 @@
             },
             "query_down": {
               "type": "boolean",
-              "description": "Include execution region/chunk information"
+              "description": "Include execution region/chunk information. Defaults to false here; true adds per-region details (chunks, agents, region summaries)."
             },
             "query_up": {
               "type": "boolean",
-              "description": "Include parent configuration details"
+              "description": "Include parent configuration details. Defaults to false here; true adds the full test configuration (its test case, scenario, scriptParams and settings)."
             },
             "query_includeScript": {
               "type": "boolean",
-              "description": "Include test script/scenario information"
+              "description": "Include test script/scenario information. Defaults to false here; true adds the scenario (script) object."
             },
             "query_includeSummary": {
               "type": "boolean",
-              "description": "Include aggregated metrics summary"
+              "description": "Include aggregated metrics summary. Defaults to false here; true adds the aggregated metrics summary (getExecutionSummary also returns it)."
             },
             "query_includeAssignments": {
               "type": "boolean",

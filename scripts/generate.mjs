@@ -21,6 +21,33 @@ const DIRECT = [
   'stopExecution',
 ];
 
+// Query flags the tools set to false unless the model passes them, and what passing true adds back.
+// With all four on, one execution is ~58 KB (mostly the configuration, metrics and regions); with
+// them off it is ~4 KB and still has the status, times and test case/configuration/scenario names.
+// The extension's own calls (t.run) are not affected.
+const EXECUTION_EXTRAS = {
+  query_up: 'the full test configuration (its test case, scenario, scriptParams and settings)',
+  query_includeScript: 'the scenario (script) object',
+  query_includeSummary: 'the aggregated metrics summary (getExecutionSummary also returns it)',
+  query_down: 'per-region details (chunks, agents, region summaries)',
+};
+// Each embedded parent or latest execution is 9-23 KB; flags whose false drops data the model
+// usually needs stay on (getScenario down carries `main`, the code; getTestCase down the
+// configuration and scenario lists).
+const OFF_BY_DEFAULT = {
+  getExecution: EXECUTION_EXTRAS,
+  getTestConfExecutions: EXECUTION_EXTRAS,
+  getScenario: { query_up: 'the parent test case with its configurations' },
+  getTestConf: {
+    query_up: 'the parent test case with its configurations',
+    query_includeLatestExecution: 'the latest execution in full (getTestConfExecutions lists executions too)',
+  },
+  getTestCase: {
+    query_up: 'the organization object',
+    query_includeMetricDefs: 'the metric definitions (getTestCaseMetricDefs also returns them)',
+  },
+};
+
 // Implemented inside the extension because the REST API has no equivalent.
 const LOCAL = new Set(['encode_base64', 'decode_base64']);
 
@@ -57,6 +84,20 @@ for (const tool of discovery.tools) {
     description: tool.description.trim(),
     inputSchema: tool.inputSchema ?? { type: 'object', properties: {} },
   };
+  const off = OFF_BY_DEFAULT[tool.name];
+  if (off) {
+    const props = entry.inputSchema.properties ?? {};
+    const unknown = Object.keys(off).filter((k) => !props[k]);
+    if (unknown.length) throw new Error(`OFF_BY_DEFAULT names parameters ${tool.name} does not have: ${unknown.join(', ')}`);
+    entry.offByDefault = off;
+    entry.description += `\n\nIn this extension ${Object.keys(off).map((k) => k.slice('query_'.length)).join(', ')} default to false to keep the response small; pass query_<name>: true for what you need. The result says what was left out.`;
+    entry.inputSchema = {
+      ...entry.inputSchema,
+      properties: Object.fromEntries(
+        Object.entries(props).map(([k, v]) => [k, off[k] ? { ...v, description: `${v.description}. Defaults to false here; true adds ${off[k]}.` } : v])
+      ),
+    };
+  }
   if (LOCAL.has(tool.name)) operations.push({ ...entry, kind: 'local' });
   else if (UNAVAILABLE[tool.name]) unavailable.push({ name: tool.name, reason: UNAVAILABLE[tool.name] });
   else if (MCP_ONLY_PATH.test(path)) unavailable.push({ name: tool.name, reason: MCP_ONLY_REASON });
