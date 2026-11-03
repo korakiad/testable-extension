@@ -13,6 +13,10 @@
   - `getTestConf`: `up`, `includeLatestExecution` (49 KB → 5 KB)
   - `getTestCase`: `up`, `includeMetricDefs` (49 KB → 29 KB)
 
+### เพิ่ม
+
+- Copilot skill `testable-execution-scenario` (ต้องใช้ VS Code 1.109 ขึ้นไป) บอกว่า `scenarioId` ของ execution เป็นสำเนา scenario แบบอ่านอย่างเดียวที่ Testable ทำแยกให้แต่ละรอบรัน แก้ได้แต่ไม่มีผลกับรอบถัดไป และบอกวิธีหา scenario ตัวจริงจาก configuration (`getTestConf` → `script.id`) ก่อนเปลี่ยน branch, setting, param หรือไฟล์ ถ้า user ให้ link ของ test case มา จะดึงรายชื่อ scenario แล้วถามว่าจะเปลี่ยนตัวไหน หลายตัว หรือทั้งหมด
+
 ## 0.2.0 — 2026-10-28
 
 ทดสอบกับ VS Code 1.143

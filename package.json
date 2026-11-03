@@ -26,6 +26,11 @@
     "onStartupFinished"
   ],
   "contributes": {
+    "chatSkills": [
+      {
+        "path": "./skills/testable-execution-scenario/SKILL.md"
+      }
+    ],
     "commands": [
       {
         "command": "testable.openDashboard",

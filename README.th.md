@@ -38,6 +38,13 @@ Mapping ของ argument เหมือนของ Testable: `path_x` ใส
 
 Testable ใส่ API key ไว้ใน URL ที่ส่งกลับมา (`...?key=...`) extension จะลบออกก่อนส่งข้อความให้ model
 
+### Skill
+
+`testable-execution-scenario` (VS Code 1.109 ขึ้นไป) ใช้ตอนที่ user ให้ link หรือ ID ของ execution หรือ test case มา แล้วอยากเปลี่ยนสิ่งที่มันรัน เช่น branch, setting, param หรือไฟล์
+
+- จาก execution: Testable ทำสำเนา scenario ให้ทุก execution และ `scenarioId` ของ execution ก็คือสำเนาที่อ่านได้อย่างเดียวตัวนั้น แก้สำเนาได้สำเร็จก็จริง แต่รอบรันถัดไปไม่เปลี่ยนอะไรเลย skill นี้บอก Copilot ให้ไปหา scenario ตัวจริงจาก configuration แทน (`getTestConf` → `script.id`)
+- จาก test case: Copilot ดึงรายชื่อ scenario ของ test case (`getTestCaseScenarios`) ถ้ามีหลายตัวที่เข้าข่าย จะถามว่าจะเปลี่ยนตัวเดียว หลายตัว หรือทั้งหมด และบอกตัวที่เปลี่ยนไม่ได้ด้วย เช่น scenario ที่ไม่ได้ต่อ repo จะเปลี่ยน branch ไม่ได้
+
 ## ติดตั้งและใช้งาน
 
 1. ติดตั้ง `testable-tools-<version>.vsix` ผ่าน Extensions → `...` → Install from VSIX (โหลดจาก GitHub Releases หรือ build เองด้วย `npm run package`)
