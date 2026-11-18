@@ -4,7 +4,9 @@
 // ran last, since the same repo can end up in more than one organization.
 import * as vscode from 'vscode';
 import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
 import { redactSecrets } from './client';
+import { SessionKey, SessionOrg, SignInCancelled, SignInResult, signIn, webHost } from './session';
 import * as testable from './testable';
 
 export interface Account extends testable.AccountRef {
@@ -29,6 +31,7 @@ const LIST = 'testable.accounts';
 const PICK = 'testable.account';
 const LEGACY_SECRET = 'testable.apiKey';
 const secretName = (id: string) => `testable.apiKey.${id}`;
+const NO_KEY = 'No Testable API key is set. Call testable_signIn to let the user log in and choose their API keys, or ask them to run the "Testable: Add API Key" command.';
 
 export class Accounts {
   private readonly changed = new vscode.EventEmitter<void>();
@@ -58,12 +61,9 @@ export class Accounts {
     await this.migrate();
     const picked = this.picked();
     if (picked) return picked;
+    if (!this.list().length) await this.first();
     const all = this.list();
-    if (!all.length) {
-      const added = await this.add();
-      if (!added) throw new Error('No Testable API key is set. Ask the user to run the "Testable: Add API Key" command.');
-      return added;
-    }
+    if (!all.length) throw new Error(NO_KEY);
     if (all.length === 1) return all[0];
     this.detecting ??= this.detect().finally(() => (this.detecting = undefined));
     return this.detecting;
@@ -88,7 +88,7 @@ export class Accounts {
     throw new Error(
       all.length
         ? `No Testable API key is named "${name}". The user's API keys: ${all.join(', ')}. Pass one of these names as apiKey, "${testable.EVERY_KEY}" to look in every organization, or leave apiKey out to use this workspace's key.`
-        : 'No Testable API key is set. Ask the user to run the "Testable: Add API Key" command.'
+        : NO_KEY
     );
   }
 
@@ -135,11 +135,10 @@ export class Accounts {
       })
     )?.trim();
     if (!key) return undefined;
-    for (const a of this.list()) {
-      if ((await this.context.secrets.get(secretName(a.id))) === key) {
-        vscode.window.showInformationMessage(`This API key is already added as "${a.name}".`);
-        return a;
-      }
+    const same = (await this.stored()).get(key);
+    if (same) {
+      vscode.window.showInformationMessage(`This API key is already added as "${same.name}".`);
+      return same;
     }
 
     let orgId: number | undefined;
@@ -168,6 +167,110 @@ export class Accounts {
     return account;
   }
 
+  /**
+   * Opens the Testable login page in a browser window, then lists the API keys of every
+   * organization the user belongs to and saves the ones they tick, named after the organization.
+   * Returns what was saved and what the login found; no key leaves this class.
+   */
+  async signIn(token?: vscode.CancellationToken): Promise<{ saved: Account[]; orgs: SessionOrg[] } | undefined> {
+    const host = await this.webAddress();
+    if (!host) return undefined;
+    let found: SignInResult;
+    try {
+      found = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: `Waiting for you to log in at ${host} in the browser window…`, cancellable: true },
+        (_progress, cancel) => {
+          const abort = new AbortController();
+          cancel.onCancellationRequested(() => abort.abort());
+          token?.onCancellationRequested(() => abort.abort());
+          return signIn({
+            host,
+            profileDir: path.join(this.context.globalStorageUri.fsPath, 'login-browser'),
+            browserPath: vscode.workspace.getConfiguration('testable').get<string>('loginBrowser'),
+            signal: abort.signal,
+          });
+        }
+      );
+    } catch (err) {
+      if (err instanceof SignInCancelled) return undefined;
+      throw err;
+    }
+
+    const { orgs } = found;
+    const stored = await this.stored();
+    const notes = [
+      ...orgs.filter((o) => o.error).map((o) => `Could not read the API keys of "${o.name}": ${o.error}.`),
+      ...orgs.filter((o) => !o.error && !o.keys.length).map((o) => `"${o.name}" has no API key yet.`),
+    ];
+    this.log.info(`Signed in at ${host}: ${orgs.length} organizations, ${orgs.reduce((n, o) => n + o.keys.length, 0)} API keys. ${notes.join(' ')}`);
+    if (!orgs.some((o) => o.keys.length)) {
+      vscode.window.showWarningMessage(
+        orgs.length
+          ? `No API key to save. ${notes.join(' ')} Create one under Settings → API Keys in Testable, then sign in again.`
+          : 'This Testable login belongs to no organization.'
+      );
+      return { saved: [], orgs };
+    }
+
+    type Item = vscode.QuickPickItem & { org?: SessionOrg; key?: SessionKey };
+    const items: Item[] = orgs
+      .filter((o) => o.keys.length)
+      .flatMap((org) => {
+        // One key is enough for an organization, so its first Regular key (a Viewer key cannot
+        // change anything) starts ticked, unless the organization already has a saved key.
+        const covered = this.list().some((a) => a.orgId === org.id) || org.keys.some((k) => stored.has(k.key));
+        const suggested = covered ? undefined : org.keys.find((k) => k.accessType?.toLowerCase() === 'regular');
+        return [
+          { label: [org.name, `org ${org.id}`, org.role].filter(Boolean).join(' · '), kind: vscode.QuickPickItemKind.Separator },
+          ...org.keys.map((key) => {
+            const have = stored.get(key.key);
+            return {
+              label: `$(key) ${key.description || 'API key'}`,
+              // The separator above each group names the organization, so a row has only what tells its keys apart.
+              description: [key.accessType, `…${key.key.slice(-4)}`, have && `already saved as "${have.name}"`].filter(Boolean).join(' · '),
+              picked: key === suggested,
+              org,
+              key,
+            };
+          }),
+        ];
+      });
+    const suggestions = items.filter((i) => i.picked).length;
+    const picked = await vscode.window.showQuickPick(items, {
+      title: `Save Testable API keys${found.user.email ? ` of ${found.user.email}` : ''}`,
+      placeHolder: suggestions
+        ? 'One Regular key per organization is ticked; change if needed'
+        : 'Tick the API keys to save in VS Code secret storage',
+      canPickMany: true,
+      matchOnDescription: true,
+      ignoreFocusOut: true,
+    });
+    if (!picked) return undefined;
+
+    const fresh = picked.filter((p) => p.org && p.key && !stored.has(p.key.key));
+    const list = this.list();
+    const saved: Account[] = [];
+    for (const { org, key } of fresh) {
+      const several = fresh.filter((p) => p.org === org).length > 1;
+      const name = this.freeName(several && key!.description ? `${org!.name} · ${key!.description}` : org!.name, [...list, ...saved]);
+      const account: Account = { id: randomUUID(), name, orgId: org!.id };
+      await this.context.secrets.store(secretName(account.id), key!.key);
+      saved.push(account);
+    }
+    if (saved.length) await this.save([...list, ...saved]);
+    const skipped = picked.length - fresh.length;
+    vscode.window.showInformationMessage(
+      [
+        saved.length ? `Saved ${saved.length} Testable API key${saved.length > 1 ? 's' : ''}: ${saved.map((a) => `"${a.name}"`).join(', ')}.` : 'No new Testable API key was saved.',
+        skipped ? `${skipped} already saved.` : '',
+        ...notes,
+      ]
+        .filter(Boolean)
+        .join(' ')
+    );
+    return { saved, orgs };
+  }
+
   async remove(account: Account) {
     await this.context.secrets.delete(secretName(account.id));
     await this.save(this.list().filter((a) => a.id !== account.id));
@@ -185,7 +288,7 @@ export class Accounts {
    */
   async select(links?: AccountLink[]): Promise<Account | undefined> {
     await this.migrate();
-    type Item = vscode.QuickPickItem & { account?: Account; add?: boolean };
+    type Item = vscode.QuickPickItem & { account?: Account; add?: boolean; signIn?: boolean };
     const rename = { iconPath: new vscode.ThemeIcon('edit'), tooltip: 'Rename' };
     const remove = { iconPath: new vscode.ThemeIcon('trash'), tooltip: 'Remove' };
     const qp = vscode.window.createQuickPick<Item>();
@@ -211,7 +314,11 @@ export class Accounts {
           account,
         };
       });
-      items.push({ label: '', kind: vscode.QuickPickItemKind.Separator }, { label: '$(add) Add API Key…', add: true });
+      items.push(
+        { label: '', kind: vscode.QuickPickItemKind.Separator },
+        { label: '$(sign-in) Sign In to Import API Keys…', signIn: true },
+        { label: '$(add) Add API Key…', add: true }
+      );
       qp.items = items;
       qp.activeItems = items.filter((i) => i.account && i.account.id === active);
     };
@@ -242,6 +349,8 @@ export class Accounts {
       else await this.remove(choice.account);
       return this.select(links);
     }
+    // After a sign-in the list has new keys to choose from, with what each links to this repo.
+    if (choice.signIn) return (await this.signIn())?.saved.length ? this.select() : undefined;
     const account = choice.add ? await this.add() : choice.account;
     if (account) await this.use(account.id);
     return account;
@@ -260,6 +369,47 @@ export class Accounts {
       await this.context.secrets.delete(LEGACY_SECRET);
     })().catch((err) => this.log.warn(`Could not move the old API key: ${err}`));
     return this.migrated;
+  }
+
+  /** With no key yet, offers the browser sign-in or pasting one. */
+  private async first() {
+    const signIn = { label: '$(sign-in) Sign in to Testable in the browser', detail: 'Log in (password or company SSO), then choose which API keys of your organizations to save.' };
+    const paste = { label: '$(key) Paste an API key', detail: 'Found under Settings → API Keys in Testable.' };
+    const choice = await vscode.window.showQuickPick([signIn, paste], { title: 'Testable needs an API key', ignoreFocusOut: true });
+    if (choice === signIn) await this.signIn();
+    else if (choice === paste) await this.add();
+  }
+
+  /** The saved accounts by their key, to spot a key that is already saved. */
+  private async stored(): Promise<Map<string, Account>> {
+    const keys = await Promise.all(this.list().map(async (a) => [await this.context.secrets.get(secretName(a.id)), a] as const));
+    return new Map(keys.filter((entry): entry is [string, Account] => !!entry[0]));
+  }
+
+  /** `wanted`, or with a number added when another key has the name or it is the reserved one. */
+  private freeName(wanted: string, taken: Account[]): string {
+    const free = (name: string) => !testable.isEveryKey(name) && !taken.some((a) => a.name === name);
+    for (let n = 1; ; n++) {
+      const name = n === 1 ? wanted : `${wanted} ${n}`;
+      if (free(name)) return name;
+    }
+  }
+
+  /** The host the user opens Testable at (a company login has its own); asked once and kept in the settings. */
+  private async webAddress(): Promise<string | undefined> {
+    const config = vscode.workspace.getConfiguration('testable');
+    const set = webHost(config.get<string>('webUrl', ''));
+    if (set) return set;
+    const answer = await vscode.window.showInputBox({
+      title: 'Testable web address',
+      prompt: 'The address you open Testable at. A company login (SSO) has its own, e.g. yourcompany.testable.io. Saved as the testable.webUrl setting.',
+      value: 'a.testable.io',
+      ignoreFocusOut: true,
+      validateInput: (v) => (/^[a-z0-9.-]+\.[a-z]{2,}$/.test(webHost(v)) ? undefined : 'Enter a host name such as yourcompany.testable.io.'),
+    });
+    if (!answer) return undefined;
+    await config.update('webUrl', webHost(answer), vscode.ConfigurationTarget.Global);
+    return webHost(answer);
   }
 
   private get(id: string): Account {
@@ -332,6 +482,9 @@ export function registerAccounts(context: vscode.ExtensionContext, accounts: Acc
     item,
     accounts.onDidChange(update),
     vscode.commands.registerCommand('testable.addApiKey', () => accounts.add()),
+    vscode.commands.registerCommand('testable.signIn', () =>
+      accounts.signIn().then(undefined, (err) => vscode.window.showErrorMessage(`Testable sign-in failed: ${(err as Error).message}`))
+    ),
     vscode.commands.registerCommand('testable.selectApiKey', () => accounts.select()),
     vscode.commands.registerCommand('testable.removeApiKey', async () => {
       const items = accounts.list().map((account) => ({ label: account.name, description: account.orgId ? `org ${account.orgId}` : undefined, account }));

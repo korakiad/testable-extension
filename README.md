@@ -31,6 +31,7 @@ Tools that write always show the values before and after for confirmation first.
 | `testable_describeTools` | Shows an operation's full schema |
 | `testable_callTool` | Calls any operation in the catalog (172 of them) |
 | 12 `testable_<operation>` tools | Frequently used operations, declared directly with their schemas |
+| `testable_signIn` | Opens the Testable login in a browser, then lets the user choose which API keys of their organizations to save. The model gets the names of the saved keys, never the keys |
 
 Write operations (POST/PUT/DELETE) show a confirmation with the endpoint and arguments before sending.
 
@@ -48,12 +49,22 @@ Testable puts the API key in the URLs it returns (`...?key=...`). The extension 
 ## Install and use
 
 1. Install `testable-tools-<version>.vsix` from Extensions → `...` → Install from VSIX (download it from GitHub Releases or build it with `npm run package`)
-2. Run **Testable: Add API Key** (the key is stored in VS Code's SecretStorage)
+2. Run **Testable: Sign In and Import API Keys** to log in and choose your keys, or **Testable: Add API Key** to paste one (keys are stored in VS Code's SecretStorage)
 3. Open Copilot Chat in Agent mode and turn on the tools that start with Testable
+
+### Sign in to import API keys
+
+**Testable: Sign In and Import API Keys** (or asking Copilot to sign in to Testable) opens the Testable login page in a Microsoft Edge or Google Chrome window. Log in the way you normally do, with a password or your company's single sign-on. The window then closes, and VS Code lists the API keys of every organization you belong to. The first Regular key of each organization is already ticked (one key is enough for an organization, and a Viewer key cannot change anything); change the ticks if you want other keys, then press OK. Each key is stored in SecretStorage under its organization's name. An organization that already has a saved key gets no tick.
+
+- The first sign-in asks for the address you open Testable at and saves it as `testable.webUrl`. A company login has its own address, such as `yourcompany.testable.io`
+- The window uses its own browser profile, kept in the extension's storage folder, so your company login can be remembered between sign-ins. It does not touch your normal browser profile
+- The login session is used once to read the organizations and their keys, and is not stored
+- Organizations without an API key are listed in the result. Create a key under Settings → API Keys in Testable, then sign in again
+- `testable.loginBrowser` sets the browser executable when Edge or Chrome is not found automatically
 
 ### Multiple API keys (multiple orgs)
 
-Add as many keys as you need with **Testable: Add API Key**. The extension checks each key with Testable and asks for a name (the default is `Org <id>`, because an API key cannot read the org's name).
+Add as many keys as you need by signing in or with **Testable: Add API Key**. When you paste a key, the extension checks it with Testable and asks for a name (the default is `Org <id>`, because an API key cannot read the org's name).
 
 Each workspace uses one key at a time. If there is more than one key and none has been chosen for this workspace, the first Testable call checks the workspace's git remote against every key and picks the org that has test cases bound to this repo with the latest run, then tells you which key it picked and why.
 

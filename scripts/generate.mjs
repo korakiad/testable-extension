@@ -194,6 +194,18 @@ const metaTools = [
       required: ['toolName'],
     }),
   },
+  {
+    name: 'testable_signIn',
+    displayName: 'Testable: Sign In',
+    toolReferenceName: 'testable_signIn',
+    canBeReferencedInPrompt: true,
+    icon: '$(sign-in)',
+    tags: ['testable'],
+    userDescription: 'Log in to Testable in a browser and choose which API keys to save.',
+    modelDescription:
+      "Opens a browser window on the user's Testable login page (password or company single sign-on). Once they are logged in, VS Code lists the API keys of every organization they belong to and saves the ones they tick into its secret storage, each named after its organization. Use it when no API key is set, when the user asks to log in to Testable, or to add the keys of their other organizations. The keys never go through the chat: the result has the names of the saved keys (usable as apiKey in the other tools) and the organizations found. It waits for the user, which can take minutes.",
+    inputSchema: { type: 'object', properties: {} },
+  },
 ];
 
 // Implemented by hand in src/extension.ts; each also renders a page in the chat (src/ui.ts).

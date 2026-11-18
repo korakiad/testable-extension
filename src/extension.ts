@@ -64,7 +64,20 @@ export function activate(context: vscode.ExtensionContext) {
         },
         (input) => findOperation(input.toolName)?.access === 'read'
       )
-    )
+    ),
+    // The keys stay in VS Code: the model gets the names of the saved keys and the organizations found.
+    vscode.lm.registerTool('testable_signIn', {
+      prepareInvocation: () => ({ invocationMessage: 'Waiting for you to log in to Testable in the browser and choose API keys' }),
+      async invoke(_options, token) {
+        const result = await accounts.signIn(token);
+        if (!result) return json({ cancelled: true, message: 'The user cancelled the sign-in. Do not start it again unless they ask.' });
+        return json({
+          saved: result.saved.map((a) => ({ apiKey: a.name, organizationId: a.orgId })),
+          organizations: result.orgs.map((o) => ({ id: o.id, name: o.name, role: o.role, apiKeysFound: o.keys.length, error: o.error })),
+          apiKeys: accounts.list().map((a) => a.name),
+        });
+      },
+    })
   );
 
   const services: Services = {
@@ -77,7 +90,7 @@ export function activate(context: vscode.ExtensionContext) {
   registerWorkflowTools(context, services);
 
   // The remaining contributed tools are 1:1 wrappers named testable_<operation>.
-  const meta = new Set(['testable_searchTools', 'testable_describeTools', 'testable_callTool', ...Object.keys(WORKFLOW_TOOLS)]);
+  const meta = new Set(['testable_searchTools', 'testable_describeTools', 'testable_callTool', 'testable_signIn', ...Object.keys(WORKFLOW_TOOLS)]);
   const contributed: { name: string }[] = context.extension.packageJSON.contributes?.languageModelTools ?? [];
   for (const { name } of contributed.filter((t) => !meta.has(t.name))) {
     const op = resolve(name.slice(PREFIX.length));
