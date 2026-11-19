@@ -6,9 +6,8 @@
 
 ### เพิ่ม
 
-- คำสั่ง **Testable: Sign In and Import API Keys** และ tool `testable_signIn`: เปิดหน้า login ของ Testable ในหน้าต่าง Edge หรือ Chrome (รหัสผ่านหรือ SSO ของบริษัท) พอ login เสร็จจะแสดง API key ของทุก org ที่ user อยู่โดยติ๊ก key แบบ Regular ตัวแรกของแต่ละ org ไว้ให้ก่อน (เปลี่ยนได้) แล้วเก็บลง SecretStorage โดยใช้ชื่อ org เป็นชื่อ key ตัว key ไม่ผ่านแชท
+- skill `/testable-sign-in` (VS Code 1.109 ขึ้นไป) ใช้ได้เฉพาะเมื่อ user พิมพ์เอง Copilot เริ่มเองไม่ได้ (`disable-model-invocation`) และไม่มีคำสั่งใน Command Palette: เปิดหน้า login ของ Testable ในหน้าต่าง Chrome แบบ incognito ด้วย profile ใหม่ที่ลบทิ้งเมื่อปิด (รหัสผ่านหรือ SSO ของบริษัท) พอ login เสร็จจะแสดง API key ของทุก org ที่ user อยู่โดยติ๊ก key แบบ Regular ตัวแรกของแต่ละ org ไว้ให้ก่อน (เปลี่ยนได้) แล้วเก็บลง SecretStorage โดยใช้ชื่อ org เป็นชื่อ key ตัว key ไม่ผ่านแชท skill เรียก tool `testable_signIn`
 - setting `testable.webUrl` (ที่อยู่เว็บ Testable ที่ใช้ login ถามครั้งแรกแล้วจำไว้) และ `testable.loginBrowser` (path ของ browser ถ้าหาเองไม่เจอ)
-- ตอนยังไม่มี key เลย จะให้เลือกว่าจะ sign in ผ่าน browser หรือวาง key เอง และ **Testable: Select API Key** มีรายการ Sign In เพิ่ม
 
 ## 0.3.0 — 2026-11-03
 

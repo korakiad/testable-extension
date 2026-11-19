@@ -31,7 +31,7 @@ Tool ที่เขียนข้อมูลจะแสดงค่าก่
 | `testable_describeTools` | ดู schema เต็มของ operation |
 | `testable_callTool` | เรียก operation ไหนก็ได้ใน catalog (172 ตัว) |
 | `testable_<operation>` 12 ตัว | operation ที่ใช้บ่อย ประกาศตรงพร้อม schema |
-| `testable_signIn` | เปิดหน้า login ของ Testable ใน browser แล้วให้ user เลือกว่าจะบันทึก API key ของ org ไหนบ้าง model ได้แค่ชื่อของ key ที่บันทึก ไม่ได้ตัว key |
+| `testable_signIn` | ใช้โดย skill `/testable-sign-in`: เปิดหน้า login ของ Testable ในหน้าต่าง browser แบบส่วนตัว แล้วให้ user เลือกว่าจะบันทึก API key ของ org ไหนบ้าง model ได้แค่ชื่อของ key ที่บันทึก ไม่ได้ตัว key |
 
 Operation แบบ write (POST/PUT/DELETE) จะแสดงกล่องยืนยันพร้อม endpoint และ argument ก่อนส่ง
 
@@ -49,22 +49,24 @@ Testable ใส่ API key ไว้ใน URL ที่ส่งกลับม
 ## ติดตั้งและใช้งาน
 
 1. ติดตั้ง `testable-tools-<version>.vsix` ผ่าน Extensions → `...` → Install from VSIX (โหลดจาก GitHub Releases หรือ build เองด้วย `npm run package`)
-2. รันคำสั่ง **Testable: Sign In and Import API Keys** เพื่อ login แล้วเลือก key หรือ **Testable: Add API Key** เพื่อวาง key เอง (key จะเก็บใน SecretStorage ของ VS Code)
+2. รันคำสั่ง **Testable: Add API Key** แล้ววาง key หรือพิมพ์ `/testable-sign-in` ใน Copilot Chat เพื่อ login แล้วเลือก key (key จะเก็บใน SecretStorage ของ VS Code)
 3. เปิด Copilot Chat ในโหมด Agent แล้วกดเปิด tool ที่ขึ้นต้นด้วย Testable
 
 ### Sign in เพื่อดึง API key
 
-คำสั่ง **Testable: Sign In and Import API Keys** (หรือบอก Copilot ให้ sign in Testable) จะเปิดหน้า login ของ Testable ในหน้าต่าง Microsoft Edge หรือ Google Chrome ให้ login ตามปกติ จะใช้รหัสผ่านหรือ single sign-on ของบริษัทก็ได้ พอ login เสร็จหน้าต่างจะปิดเอง แล้ว VS Code แสดง API key ของทุก org ที่คุณอยู่ key แบบ Regular ตัวแรกของแต่ละ org จะถูกติ๊กไว้ให้แล้ว (org หนึ่งใช้ key เดียวก็พอ และ key แบบ Viewer แก้อะไรไม่ได้) ถ้าอยากได้ตัวอื่นก็เปลี่ยนที่ติ๊ก แล้วกด OK แต่ละตัวจะเก็บใน SecretStorage โดยใช้ชื่อ org เป็นชื่อ key ส่วน org ที่มี key บันทึกไว้แล้วจะไม่ติ๊กให้
+พิมพ์ `/testable-sign-in` ใน Copilot Chat (โหมด Agent, VS Code 1.109 ขึ้นไป) เข้าได้ทางนี้ทางเดียว: skill ตั้งไว้ไม่ให้ Copilot เริ่มเองได้ และไม่มีคำสั่งนี้ใน Command Palette
+
+skill จะเปิดหน้า login ของ Testable ในหน้าต่าง Google Chrome แบบ incognito ให้ login ตามปกติ จะใช้รหัสผ่านหรือ single sign-on ของบริษัทก็ได้ พอ login เสร็จหน้าต่างจะปิดเอง แล้ว VS Code แสดง API key ของทุก org ที่คุณอยู่ key แบบ Regular ตัวแรกของแต่ละ org จะถูกติ๊กไว้ให้แล้ว (org หนึ่งใช้ key เดียวก็พอ และ key แบบ Viewer แก้อะไรไม่ได้) ถ้าอยากได้ตัวอื่นก็เปลี่ยนที่ติ๊ก แล้วกด OK แต่ละตัวจะเก็บใน SecretStorage โดยใช้ชื่อ org เป็นชื่อ key ส่วน org ที่มี key บันทึกไว้แล้วจะไม่ติ๊กให้
 
 - ครั้งแรกจะถามที่อยู่เว็บ Testable ที่คุณใช้ แล้วเก็บไว้ใน setting `testable.webUrl` ถ้า login ผ่านบริษัทจะมีที่อยู่ของตัวเอง เช่น `yourcompany.testable.io`
-- หน้าต่างนี้ใช้ browser profile แยกของตัวเอง เก็บในโฟลเดอร์ storage ของ extension เพื่อให้จำ login ของบริษัทไว้ใช้ครั้งถัดไปได้ ไม่ยุ่งกับ profile ของ browser ที่ใช้ประจำ
+- หน้าต่างเป็นแบบส่วนตัว ใช้ browser profile ใหม่ที่ว่างเปล่า และลบทิ้งเมื่อหน้าต่างปิด จึงไม่มีอะไรของการ login เหลืออยู่ และต้อง login ใหม่ทุกครั้ง ไม่ยุ่งกับ profile ของ browser ที่ใช้ประจำ
 - session ของการ login ใช้ครั้งเดียวเพื่ออ่านรายชื่อ org กับ key แล้วไม่ถูกเก็บไว้
 - org ที่ยังไม่มี API key จะบอกไว้ในผลลัพธ์ ให้สร้าง key ที่ Settings → API Keys ใน Testable แล้ว sign in ใหม่
-- ถ้าหา Edge หรือ Chrome ไม่เจอ ตั้ง path ของ browser ได้ที่ `testable.loginBrowser`
+- ถ้าไม่มี Chrome จะใช้ Microsoft Edge (หน้าต่าง InPrivate) แทน ถ้าหาไม่เจอทั้งคู่ ตั้ง path ของ browser ได้ที่ `testable.loginBrowser`
 
 ### หลาย API key (หลาย org)
 
-เพิ่ม key ได้หลายตัวด้วยการ sign in หรือ **Testable: Add API Key** ถ้าวาง key เอง extension จะเช็ค key กับ Testable ก่อนแล้วให้ตั้งชื่อ (ค่าเริ่มต้นเป็น `Org <id>` เพราะ API key อ่านชื่อ org ไม่ได้)
+เพิ่ม key ได้หลายตัวด้วย `/testable-sign-in` หรือ **Testable: Add API Key** ถ้าวาง key เอง extension จะเช็ค key กับ Testable ก่อนแล้วให้ตั้งชื่อ (ค่าเริ่มต้นเป็น `Org <id>` เพราะ API key อ่านชื่อ org ไม่ได้)
 
 แต่ละ workspace ใช้ key ได้ทีละตัว ถ้ามี key มากกว่าหนึ่งตัวและยังไม่ได้เลือกให้ workspace นี้ ตอนเรียก Testable ครั้งแรก extension จะเช็ค git remote ของ workspace กับทุก key แล้วเลือก org ที่มี test case ผูกกับ repo นี้และรันล่าสุด จากนั้นแจ้งว่าเลือก key ไหนเพราะอะไร
 

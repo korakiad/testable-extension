@@ -1,11 +1,13 @@
-// Browser sign-in to the Testable web app, used to import API keys. Opens Edge or Chrome
-// with its own profile on the login page, waits for the session cookie the web app sets
-// after a password or SSO login, then reads the user's organizations and their API keys
-// with that session, as the web app's own "API Keys" page does. Kept free of the vscode
-// module so it can be exercised from plain Node.
+// Browser sign-in to the Testable web app, used to import API keys. Opens a private
+// (incognito) Chrome window with a throwaway profile on the login page, waits for the
+// session cookie the web app sets after a password or SSO login, then reads the user's
+// organizations and their API keys with that session, as the web app's own "API Keys"
+// page does. Nothing of the login is kept: the profile is deleted once the window closes.
+// Kept free of the vscode module so it can be exercised from plain Node.
 import { ChildProcess, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { basename, join } from 'node:path';
 import { Readable, Writable } from 'node:stream';
 
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -53,7 +55,9 @@ export function sessionApiUrl(host: string): string {
   return host === 'a.testable.io' || host === 'testable.io' ? 'https://api.testable.io' : `https://${host}/api`;
 }
 
-/** Edge or Chrome; Edge first on Windows because it signs in to Microsoft Entra with the Windows account. */
+const isEdge = (exe: string) => /edge/i.test(basename(exe));
+
+/** Chrome, or Edge when there is no Chrome. */
 export function findBrowser(preferred?: string): string | undefined {
   if (preferred?.trim()) return existsSync(preferred.trim()) ? preferred.trim() : undefined;
   const env = process.env;
@@ -66,30 +70,34 @@ export function findBrowser(preferred?: string): string | undefined {
         ? ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge']
         : ['/usr/bin/google-chrome', '/usr/bin/microsoft-edge', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/snap/bin/chromium'];
   const found = candidates.filter((p) => existsSync(p));
-  return found.find((p) => /msedge/i.test(p)) ?? found[0];
+  return found.find((p) => !isEdge(p)) ?? found[0];
 }
 
 /**
- * Opens the login page of the Testable web app at `host` in a browser window, waits until the
- * user is logged in, closes the window and returns the user's organizations with their API keys.
+ * Opens the login page of the Testable web app at `host` in a private browser window, waits until
+ * the user is logged in, closes the window and returns the user's organizations with their API keys.
+ * The window gets a new profile folder inside `profileRoot`, deleted afterwards.
  */
-export async function signIn(opts: { host: string; profileDir: string; browserPath?: string; signal?: AbortSignal; timeoutMs?: number }): Promise<SignInResult> {
+export async function signIn(opts: { host: string; profileRoot: string; browserPath?: string; signal?: AbortSignal; timeoutMs?: number }): Promise<SignInResult> {
   const host = webHost(opts.host);
   if (!/^[a-z0-9.-]+$/.test(host)) throw new Error(`"${opts.host}" is not a web address.`);
   const exe = findBrowser(opts.browserPath);
   if (!exe) {
     throw new Error(
-      opts.browserPath?.trim() ? `No browser at "${opts.browserPath}" (the testable.loginBrowser setting).` : 'Signing in needs Microsoft Edge or Google Chrome, and neither was found. Set testable.loginBrowser to the path of one.'
+      opts.browserPath?.trim() ? `No browser at "${opts.browserPath}" (the testable.loginBrowser setting).` : 'Signing in needs Google Chrome (or Microsoft Edge), and neither was found. Set testable.loginBrowser to the path of one.'
     );
   }
-  await mkdir(opts.profileDir, { recursive: true });
+  await mkdir(opts.profileRoot, { recursive: true });
+  const profileDir = await mkdtemp(join(opts.profileRoot, 'login-'));
   const api = sessionApiUrl(host);
-  const browser = new Browser(exe, opts.profileDir, `https://${host}/login`);
+  const browser = new Browser(exe, profileDir, `https://${host}/login`);
   let session: { sid: string; login: any };
   try {
     session = await waitForSession(browser, host, api, opts.signal, opts.timeoutMs ?? LOGIN_TIMEOUT_MS);
   } finally {
     await browser.close();
+    // The browser lets go of its files a moment after it exits.
+    await rm(profileDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 }).catch(() => undefined);
   }
 
   const { sid, login } = session;
@@ -110,25 +118,53 @@ export async function signIn(opts: { host: string; profileDir: string; browserPa
   return { user: { name: login.user?.name, email: login.user?.email }, orgs };
 }
 
-/** Polls the browser's cookies for the web app's session id and checks each new one with the API. */
+/** Polls the window's cookies for the web app's session id and checks each new one with the API. */
 async function waitForSession(browser: Browser, host: string, api: string, signal: AbortSignal | undefined, timeoutMs: number) {
   const deadline = Date.now() + timeoutMs;
   const tried = new Set<string>();
+  const attached = new Map<string, string>();
+  let opened = false;
   for (;;) {
     await new Promise((r) => setTimeout(r, 1000));
     if (signal?.aborted) throw new SignInCancelled();
-    if (browser.closed) throw new SignInCancelled('The browser window was closed before the login finished.');
+    // On macOS the browser keeps running after its last window is closed, so look for the window too.
+    const pages = await browser
+      .send<{ targetInfos: { type: string; targetId: string }[] }>('Target.getTargets')
+      .then((r) => r.targetInfos.filter((t) => t.type === 'page'))
+      .catch(() => undefined);
+    opened ||= !!pages?.length;
+    if (browser.closed || (opened && pages?.length === 0)) throw new SignInCancelled('The browser window was closed before the login finished.');
     if (Date.now() > deadline) throw new Error('Timed out waiting for the Testable login.');
-    const { cookies } = await browser.send<{ cookies: { name: string; value: string; domain: string }[] }>('Storage.getCookies').catch(() => ({ cookies: [] }));
-    for (const cookie of cookies) {
-      const domain = cookie.domain.replace(/^\./, '');
-      if (cookie.name !== 'sid' || !cookie.value || !(host === domain || host.endsWith(`.${domain}`)) || tried.has(cookie.value)) continue;
+    for (const cookie of await cookies(browser, pages ?? [], attached, `https://${host}/`)) {
+      if (cookie.name !== 'sid' || !cookie.value || tried.has(cookie.value)) continue;
       tried.add(cookie.value);
-      // A cookie left from an earlier visit may have expired on the server; keep waiting then.
+      // The web app may hold a session id the server no longer accepts; keep waiting then.
       const login = await get(api, '/login', cookie.value, signal).catch(() => undefined);
       if (login?.success && login.user) return { sid: String(login.sid ?? cookie.value), login };
     }
   }
+}
+
+/**
+ * The cookies the window's tabs would send to `url`. A private window's cookies cannot be read
+ * browser-wide, only through its own pages.
+ */
+async function cookies(browser: Browser, pages: { targetId: string }[], attached: Map<string, string>, url: string) {
+  const found: { name: string; value: string }[] = [];
+  for (const { targetId } of pages) {
+    try {
+      let session = attached.get(targetId);
+      if (!session) {
+        session = (await browser.send<{ sessionId: string }>('Target.attachToTarget', { targetId, flatten: true })).sessionId;
+        attached.set(targetId, session);
+      }
+      found.push(...(await browser.send<{ cookies: { name: string; value: string }[] }>('Network.getCookies', { urls: [url] }, session)).cookies);
+    } catch {
+      // The tab closed; a tab that replaced it is attached on the next poll.
+      attached.delete(targetId);
+    }
+  }
+  return found;
 }
 
 async function apiKeys(api: string, sid: string, orgId: number, signal?: AbortSignal): Promise<SessionKey[]> {
@@ -164,9 +200,8 @@ class Browser {
   private buffer = '';
 
   constructor(exe: string, profileDir: string, url: string) {
-    this.child = spawn(exe, ['--remote-debugging-pipe', `--user-data-dir=${profileDir}`, '--no-first-run', '--no-default-browser-check', '--new-window', url], {
-      stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'],
-    });
+    const args = ['--remote-debugging-pipe', `--user-data-dir=${profileDir}`, '--no-first-run', '--no-default-browser-check', isEdge(exe) ? '--inprivate' : '--incognito', '--new-window', url];
+    this.child = spawn(exe, args, { stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'] });
     const ended = () => {
       this.closed = true;
       for (const p of this.pending.values()) p.reject(new Error('The browser closed.'));
@@ -193,12 +228,13 @@ class Browser {
     });
   }
 
-  send<T = unknown>(method: string, params: Record<string, unknown> = {}): Promise<T> {
+  /** `session` addresses one tab (from Target.attachToTarget); without it the command goes to the browser. */
+  send<T = unknown>(method: string, params: Record<string, unknown> = {}, session?: string): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       if (this.closed) return reject(new Error('The browser closed.'));
       const id = ++this.lastId;
       this.pending.set(id, { resolve, reject });
-      this.input.write(JSON.stringify({ id, method, params }) + '\0');
+      this.input.write(JSON.stringify({ id, method, params, sessionId: session }) + '\0');
     });
   }
 

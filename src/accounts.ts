@@ -31,7 +31,7 @@ const LIST = 'testable.accounts';
 const PICK = 'testable.account';
 const LEGACY_SECRET = 'testable.apiKey';
 const secretName = (id: string) => `testable.apiKey.${id}`;
-const NO_KEY = 'No Testable API key is set. Call testable_signIn to let the user log in and choose their API keys, or ask them to run the "Testable: Add API Key" command.';
+const NO_KEY = 'No Testable API key is set. Ask the user to run the "Testable: Add API Key" command.';
 
 export class Accounts {
   private readonly changed = new vscode.EventEmitter<void>();
@@ -61,9 +61,12 @@ export class Accounts {
     await this.migrate();
     const picked = this.picked();
     if (picked) return picked;
-    if (!this.list().length) await this.first();
     const all = this.list();
-    if (!all.length) throw new Error(NO_KEY);
+    if (!all.length) {
+      const added = await this.add();
+      if (!added) throw new Error(NO_KEY);
+      return added;
+    }
     if (all.length === 1) return all[0];
     this.detecting ??= this.detect().finally(() => (this.detecting = undefined));
     return this.detecting;
@@ -168,9 +171,10 @@ export class Accounts {
   }
 
   /**
-   * Opens the Testable login page in a browser window, then lists the API keys of every
+   * Opens the Testable login page in a private browser window, then lists the API keys of every
    * organization the user belongs to and saves the ones they tick, named after the organization.
-   * Returns what was saved and what the login found; no key leaves this class.
+   * Returns what was saved and what the login found; no key leaves this class. Reached only
+   * through the testable_signIn tool, which the /testable-sign-in skill calls.
    */
   async signIn(token?: vscode.CancellationToken): Promise<{ saved: Account[]; orgs: SessionOrg[] } | undefined> {
     const host = await this.webAddress();
@@ -178,14 +182,14 @@ export class Accounts {
     let found: SignInResult;
     try {
       found = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: `Waiting for you to log in at ${host} in the browser window…`, cancellable: true },
+        { location: vscode.ProgressLocation.Notification, title: `Waiting for you to log in at ${host} in the private browser window…`, cancellable: true },
         (_progress, cancel) => {
           const abort = new AbortController();
           cancel.onCancellationRequested(() => abort.abort());
           token?.onCancellationRequested(() => abort.abort());
           return signIn({
             host,
-            profileDir: path.join(this.context.globalStorageUri.fsPath, 'login-browser'),
+            profileRoot: path.join(this.context.globalStorageUri.fsPath, 'login-browser'),
             browserPath: vscode.workspace.getConfiguration('testable').get<string>('loginBrowser'),
             signal: abort.signal,
           });
@@ -288,7 +292,7 @@ export class Accounts {
    */
   async select(links?: AccountLink[]): Promise<Account | undefined> {
     await this.migrate();
-    type Item = vscode.QuickPickItem & { account?: Account; add?: boolean; signIn?: boolean };
+    type Item = vscode.QuickPickItem & { account?: Account; add?: boolean };
     const rename = { iconPath: new vscode.ThemeIcon('edit'), tooltip: 'Rename' };
     const remove = { iconPath: new vscode.ThemeIcon('trash'), tooltip: 'Remove' };
     const qp = vscode.window.createQuickPick<Item>();
@@ -314,11 +318,7 @@ export class Accounts {
           account,
         };
       });
-      items.push(
-        { label: '', kind: vscode.QuickPickItemKind.Separator },
-        { label: '$(sign-in) Sign In to Import API Keys…', signIn: true },
-        { label: '$(add) Add API Key…', add: true }
-      );
+      items.push({ label: '', kind: vscode.QuickPickItemKind.Separator }, { label: '$(add) Add API Key…', add: true });
       qp.items = items;
       qp.activeItems = items.filter((i) => i.account && i.account.id === active);
     };
@@ -349,8 +349,6 @@ export class Accounts {
       else await this.remove(choice.account);
       return this.select(links);
     }
-    // After a sign-in the list has new keys to choose from, with what each links to this repo.
-    if (choice.signIn) return (await this.signIn())?.saved.length ? this.select() : undefined;
     const account = choice.add ? await this.add() : choice.account;
     if (account) await this.use(account.id);
     return account;
@@ -369,15 +367,6 @@ export class Accounts {
       await this.context.secrets.delete(LEGACY_SECRET);
     })().catch((err) => this.log.warn(`Could not move the old API key: ${err}`));
     return this.migrated;
-  }
-
-  /** With no key yet, offers the browser sign-in or pasting one. */
-  private async first() {
-    const signIn = { label: '$(sign-in) Sign in to Testable in the browser', detail: 'Log in (password or company SSO), then choose which API keys of your organizations to save.' };
-    const paste = { label: '$(key) Paste an API key', detail: 'Found under Settings → API Keys in Testable.' };
-    const choice = await vscode.window.showQuickPick([signIn, paste], { title: 'Testable needs an API key', ignoreFocusOut: true });
-    if (choice === signIn) await this.signIn();
-    else if (choice === paste) await this.add();
   }
 
   /** The saved accounts by their key, to spot a key that is already saved. */
@@ -482,9 +471,6 @@ export function registerAccounts(context: vscode.ExtensionContext, accounts: Acc
     item,
     accounts.onDidChange(update),
     vscode.commands.registerCommand('testable.addApiKey', () => accounts.add()),
-    vscode.commands.registerCommand('testable.signIn', () =>
-      accounts.signIn().then(undefined, (err) => vscode.window.showErrorMessage(`Testable sign-in failed: ${(err as Error).message}`))
-    ),
     vscode.commands.registerCommand('testable.selectApiKey', () => accounts.select()),
     vscode.commands.registerCommand('testable.removeApiKey', async () => {
       const items = accounts.list().map((account) => ({ label: account.name, description: account.orgId ? `org ${account.orgId}` : undefined, account }));

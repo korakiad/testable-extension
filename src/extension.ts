@@ -65,9 +65,10 @@ export function activate(context: vscode.ExtensionContext) {
         (input) => findOperation(input.toolName)?.access === 'read'
       )
     ),
-    // The keys stay in VS Code: the model gets the names of the saved keys and the organizations found.
+    // For the /testable-sign-in skill, which only the user can start. The keys stay in VS Code:
+    // the model gets the names of the saved keys and the organizations found.
     vscode.lm.registerTool('testable_signIn', {
-      prepareInvocation: () => ({ invocationMessage: 'Waiting for you to log in to Testable in the browser and choose API keys' }),
+      prepareInvocation: () => ({ invocationMessage: 'Waiting for you to log in to Testable in the private browser window and choose API keys' }),
       async invoke(_options, token) {
         const result = await accounts.signIn(token);
         if (!result) return json({ cancelled: true, message: 'The user cancelled the sign-in. Do not start it again unless they ask.' });
