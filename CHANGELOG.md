@@ -2,6 +2,13 @@
 
 บันทึกสิ่งที่เปลี่ยนในแต่ละเวอร์ชัน เลขเวอร์ชันใช้ [Semantic Versioning](https://semver.org/) วิธีออกเวอร์ชันดูที่ [README](README.th.md#ออกเวอร์ชันใหม่)
 
+## ยังไม่ออกเวอร์ชัน
+
+### เพิ่ม
+
+- skill `/testable-sign-in` (VS Code 1.109 ขึ้นไป) ใช้ได้เฉพาะเมื่อ user พิมพ์เอง Copilot เริ่มเองไม่ได้ (`disable-model-invocation`) และไม่มีคำสั่งใน Command Palette: เปิดหน้า login ของ Testable ในหน้าต่าง Chrome แบบ incognito ด้วย profile ใหม่ที่ลบทิ้งเมื่อปิด (รหัสผ่านหรือ SSO ของบริษัท) พอ login เสร็จจะแสดง API key ของทุก org ที่ user อยู่โดยติ๊ก key แบบ Regular ตัวแรกของแต่ละ org ไว้ให้ก่อน (เปลี่ยนได้) แล้วเก็บลง SecretStorage โดยใช้ชื่อ org เป็นชื่อ key ตัว key ไม่ผ่านแชท skill เรียก tool `testable_signIn`
+- setting `testable.webUrl` (ที่อยู่เว็บ Testable ที่ใช้ login ถามครั้งแรกแล้วจำไว้) และ `testable.loginBrowser` (path ของ browser ถ้าหาเองไม่เจอ)
+
 ## 0.3.0 — 2026-11-03
 
 ### เปลี่ยน
