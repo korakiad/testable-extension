@@ -12,6 +12,7 @@ import { Readable, Writable } from 'node:stream';
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const LOGIN_TIMEOUT_MS = 10 * 60_000;
+const SESSION_RECHECK_MS = 3000;
 
 export interface SessionKey {
   key: string;
@@ -87,6 +88,7 @@ export async function signIn(opts: { host: string; profileRoot: string; browserP
       opts.browserPath?.trim() ? `No browser at "${opts.browserPath}" (the testable.loginBrowser setting).` : 'Signing in needs Google Chrome (or Microsoft Edge), and neither was found. Set testable.loginBrowser to the path of one.'
     );
   }
+  if (opts.signal?.aborted) throw new SignInCancelled();
   await mkdir(opts.profileRoot, { recursive: true });
   const profileDir = await mkdtemp(join(opts.profileRoot, 'login-'));
   const api = sessionApiUrl(host);
@@ -121,7 +123,7 @@ export async function signIn(opts: { host: string; profileRoot: string; browserP
 /** Polls the window's cookies for the web app's session id and checks each new one with the API. */
 async function waitForSession(browser: Browser, host: string, api: string, signal: AbortSignal | undefined, timeoutMs: number) {
   const deadline = Date.now() + timeoutMs;
-  const tried = new Set<string>();
+  const checkAgainAt = new Map<string, number>();
   const attached = new Map<string, string>();
   let opened = false;
   for (;;) {
@@ -136,11 +138,12 @@ async function waitForSession(browser: Browser, host: string, api: string, signa
     if (browser.closed || (opened && pages?.length === 0)) throw new SignInCancelled('The browser window was closed before the login finished.');
     if (Date.now() > deadline) throw new Error('Timed out waiting for the Testable login.');
     for (const cookie of await cookies(browser, pages ?? [], attached, `https://${host}/`)) {
-      if (cookie.name !== 'sid' || !cookie.value || tried.has(cookie.value)) continue;
-      tried.add(cookie.value);
-      // The web app may hold a session id the server no longer accepts; keep waiting then.
+      if (cookie.name !== 'sid' || !cookie.value || Date.now() < (checkAgainAt.get(cookie.value) ?? 0)) continue;
+      // The server may not accept this session id yet (the login is not finished, or the request
+      // failed), so the same value is checked again after a pause instead of being given up on.
       const login = await get(api, '/login', cookie.value, signal).catch(() => undefined);
       if (login?.success && login.user) return { sid: String(login.sid ?? cookie.value), login };
+      checkAgainAt.set(cookie.value, Date.now() + SESSION_RECHECK_MS);
     }
   }
 }

@@ -187,6 +187,7 @@ export class Accounts {
           const abort = new AbortController();
           cancel.onCancellationRequested(() => abort.abort());
           token?.onCancellationRequested(() => abort.abort());
+          if (token?.isCancellationRequested) abort.abort();
           return signIn({
             host,
             profileRoot: path.join(this.context.globalStorageUri.fsPath, 'login-browser'),
